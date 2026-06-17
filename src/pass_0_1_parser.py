@@ -50,7 +50,7 @@ def map_node(node: ast.AST) -> Any:
             return "not"
         case ast.Is():
             return "is"
-        case ast.Constant(value) if type(value) is int or type(value) is bool:
+        case ast.Constant(value) if type(value) in (int, bool, float):
             return EConst(value)
         case ast.Name(id, _):
             if not all([(c.isalnum() or c == "_") for c in id]):
@@ -132,6 +132,8 @@ def map_type_node(node: ast.AST) -> Type:
             return TInt()
         case ast.Name("bool", _):
             return TBool()
+        case ast.Name("float", _):
+            return TFloat()
         case ast.Name("None", _) | None:
             return TNone()
         case ast.Name(name, _):

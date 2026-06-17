@@ -15,6 +15,10 @@ class TInt:
     pass
 
 @dataclass
+class TFloat:
+    pass
+
+@dataclass
 class TNone:
     pass
 
@@ -48,6 +52,8 @@ def pretty_type(t: Type) -> str:
             return "int"
         case TNone():
             return "None"
+        case TFloat():
+            return "float"
         case TTuple(ts):
             return f"tuple[{pretty_types(ts)}]"
         case TCallable(param_tys, ret_ty):

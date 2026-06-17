@@ -75,7 +75,7 @@ def type_check_stmt(ctx: TCtx, s: Stmt) -> bool:
             return False
         case SPrint(e):
             te = type_check_expr(ctx, e)
-            check_type_equal(te, TInt(), e)
+            check_types_supported(te, [TInt(), TFloat()], e)
             return False
         case SAssign(x, t, e):
             if t is None:
@@ -131,6 +131,13 @@ def type_check_expr(ctx: TCtx, e: Expr) -> Type:
                         raise TypeError(f"Integer constant {x} is too large for 63bit.")
                     else:
                         return TInt()
+                case float(_):
+                    # TODO: check size of float for 32 or 64 bit like ints (probably rather 32 bits to fit into f registers)
+                    if False:
+                        pass
+                        # raise TypeError{f"Float constant {x} is too large for 32bit."}
+                    else:
+                        return TFloat()
         case EVar(x):
             if x in ctx:
                 return ctx[x]
@@ -148,6 +155,7 @@ def type_check_expr(ctx: TCtx, e: Expr) -> Type:
         case EOp2(e1, op, e2):
             t1 = type_check_expr(ctx, e1)
             t2 = type_check_expr(ctx, e2)
+
             if type(t1) is TTuple or type(t2) is TTuple:
                 match op:
                     case "is":
@@ -157,15 +165,17 @@ def type_check_expr(ctx: TCtx, e: Expr) -> Type:
                         raise TypeError(f"Operator '{op}' is not supported for tuples.")
             match op:
                 case "+" | "-":
-                    check_type_equal(t1, TInt(), e1)
-                    check_type_equal(t2, TInt(), e2)
-                    return TInt()
+                    check_type_equal(t1, t2, e)
+                    check_types_supported(t1, [TInt(), TFloat()], e1)
+                    check_types_supported(t2, [TInt(), TFloat()], e2)
+                    return t1
                 case "==" | "!=":
                     check_type_equal(t1, t2, e)
                     return TBool()
                 case "<=" | "<" | ">" | ">=":
-                    check_type_equal(t1, TInt(), e1)
-                    check_type_equal(t2, TInt(), e2)
+                    check_type_equal(t1, t2, e)
+                    check_types_supported(t1, [TInt(), TFloat()], e1)
+                    check_types_supported(t2, [TInt(), TFloat()], e2)
                     return TBool()
                 case "and" | "or":
                     check_type_equal(t1, TBool(), e1)
@@ -256,6 +266,10 @@ def check_type_equal(thave: Type, texpect: Type, es: Expr | Stmt) -> None:
     if thave != texpect:
         raise TypeError(f"I got {repr(thave)} but I expected {repr(texpect)} in {repr(es)}.")
 
+def check_types_supported(thave: Type, tsupported: Type, es: Expr | Stmt) -> None:
+    if thave not in tsupported:
+        raise TypeError(f"Type {thave} not supported for this operation")
+
 def check_ctx_equal(ctx1: TCtx, ctx2: TCtx, es: Expr | Stmt) -> None:
     for x in ctx1:
         if x in ctx2:
@@ -271,7 +285,7 @@ def types_well_formed(ctx: TCtx, ts: IList[Type]) -> None:
 
 def type_well_formed(ctx: TCtx, t: Type) -> None:
     match t:
-        case TBool() | TInt() | TNone():
+        case TBool() | TInt() | TFloat() | TNone():
             pass
         case TTuple(ts):
             types_well_formed(ctx, ts)

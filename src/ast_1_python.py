@@ -22,7 +22,7 @@ type Expr = EConst | EVar | EOp1 | EOp2 | EInput | EIf \
 
 @dataclass(frozen=True)
 class EConst:
-    value: int | bool | None
+    value: int | bool | float | None
 
 @dataclass(frozen=True)
 class EVar:

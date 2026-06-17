@@ -1,3 +1,3 @@
-a = 3.14
+a: float = 3.14
 
 print(a)

@@ -2,3 +2,17 @@
 The Engineering Gritty Details: How did you handle code generation for floating-point operations?
 Type Typing/Checking: How does your compiler catch type mismatches (e.g., trying to add an integer to a float if implicit casting isn't supported)?
 Runtime/Backend Integration: If there is a runtime system or specific assembly/IR emitted (like x86 SSE registers or LLVM float primitives), explain how you lowered the AST nodes to it.
+
+\subsection{Interpreter extension}
+\begin{itemize}
+    \item created half a dozen of test files which include floats in the programs the interpreter has to run
+    \item parser: extend ast_1_python to have accept floats 
+    \item parser: just add cases for where the python parser returns float is accepted. 
+    \item parser: add a case for float variable annotation (e.g a : float = 3.14)
+    \item type_checker: extend types_.py to have a TFloat() dataclass (just boilerplate code)
+    \item type_checker: hardcoded TInt() in various places, exchange for either TInt() or TFloat()
+    \item type_checker: changed hardcoded check_type_equal(x, TInt(), y) in SPrint() to a newly defined function which checks against multiple types one has to give a list with supported types.
+    \item type_checker: same for EOP2(): first test if both operands are equal type and then if they are in the allowed types (maybe ommit the equal types or find a way to do float / int later on)
+    \item type_checker: has to return the type of t1 and not TInt() flat in case operation was done on floats
+    \item semantics: had to add float(x1) and float(x2) to the allowed types for eop2 operations
+\end{itemize}

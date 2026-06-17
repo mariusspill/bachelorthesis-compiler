@@ -105,7 +105,7 @@ def eval_expr(env: RTEnv, e: Expr) -> Value:
             v1 = eval_expr(env, e1)
             v2 = eval_expr(env, e2)
             match v1, v2:
-                case (int(x1) | bool(x1)), (int(x2) | bool(x2)): # type: ignore
+                case (int(x1) | bool(x1) | float(x1)), (int(x2) | bool(x2) | float(x2)): # type: ignore
                     match op:
                         case "+":
                             return simulate_over_and_underflow(x1 + x2)
