@@ -4,15 +4,87 @@ Type Typing/Checking: How does your compiler catch type mismatches (e.g., trying
 Runtime/Backend Integration: If there is a runtime system or specific assembly/IR emitted (like x86 SSE registers or LLVM float primitives), explain how you lowered the AST nodes to it.
 
 \subsection{Interpreter extension}
+
+Before starting to work on the actual compiler I started working on the interpreter since the interpreter is the
+definition for the behavior of the compiler.
+
+% Source Siek's book
+
+To have a goal for what our interpreter should be able to do I wrote several test files 
+% maybe put the test files into appendix
+which are basically functions of the subset of python already implemeted and instead of integer I performed 
+the operations, control flow and instructions with floating-points instead of int. My task was it to get the
+interpreter to run these files without complaining and have the correct behavior.
+
+Extending the interpreter meant I had to touch three files:
+
 \begin{itemize}
-    \item created half a dozen of test files which include floats in the programs the interpreter has to run
-    \item parser: extend ast_1_python to have accept floats 
-    \item parser: just add cases for where the python parser returns float is accepted. 
-    \item parser: add a case for float variable annotation (e.g a : float = 3.14)
-    \item type_checker: extend types_.py to have a TFloat() dataclass (just boilerplate code)
-    \item type_checker: hardcoded TInt() in various places, exchange for either TInt() or TFloat()
-    \item type_checker: changed hardcoded check_type_equal(x, TInt(), y) in SPrint() to a newly defined function which checks against multiple types one has to give a list with supported types.
-    \item type_checker: same for EOP2(): first test if both operands are equal type and then if they are in the allowed types (maybe ommit the equal types or find a way to do float / int later on)
-    \item type_checker: has to return the type of t1 and not TInt() flat in case operation was done on floats
-    \item semantics: had to add float(x1) and float(x2) to the allowed types for eop2 operations
+    \item pass_0_1_parser.py: this file is also part of the compiler pipeline but the interpreter also depends on a passed AST.
+    \item type_checker.py: The interpreter also has to make sure the program is well typed.
+    \item semantics.py: Here the behavior of the interpreter is defined. It is the only file that
+    isnt in part of the compiler pipeline that had to be adjusted.
+\end{itemize}
+
+Extending the parser was straight forward since the parser uses the python AST module which already knows the float data type.
+All I had to do was to adjust the ast_1_python.py ast definition by allowing EConst to be of the type float. Furthermore in the 
+pass_0_1_parser.py file I had to allow the node type to be of float to to return a EConst(), the same for already annotated variables
+(map_type_node here specifically).
+
+Extending the type_checker was the more complex task and involved the first design decision handling a few trade offs at the size and
+precision checker for float numbers. Since the AST that is created is a resemblance of the python AST module's AST some python specific 
+quirks were already visible. Python allows its bits to be up to 64-bit. Numbers that are bigger than 64-bit get parsed to be infinite 
+and more precision gets cut off.
+
+Since RISC-V's register allow floating points to be only 32-bits long without extending using additional work to operate on them it was
+clear I want to label 32-bit floats as 32-bit floats. Nonetheless I wanted to create the architecture in a way thats easily extendable 
+to take 64-bits. So what I did here was testing if the number fits into 32-bit and if yes return TFloat() as its type. For floats that are
+between 32-bits and 64-bits the idea would be assigning them the type TDouble() at this point but this is not yet implemented. Checking for
+the size was easy. Just check if python parsed the float into infinite and if no its at least smaller than 64-bit. If its smaller than 3.4028235e38
+it fits into a 32-bit register. 
+
+Checking for precision loss was harder. I experimented a bit with different approaches. I wanted to make sure I was aware if I lose precision 
+in the 32-bit representation so I could dynamicly assign a double later on. 
+
+Besides the size checker I had to adjust the functions checking the types arguments for operations and function calls. The status quo 
+here was a function taking two types and check if they are equal (e.g. check_type_equal(ttest, TInt(), test)). For most arithmetic
+operations the function took a hardcoded TInt() and compared the type of the argument against that. Here I decided to create a function
+that checks for a list of allowed data types that have to be checked (e.g. check_types_supported(t1, [TInt(), TFloat()], e1)). 
+
+Since the first iteration only allows operations on the same type (in contrast to cross type operations like adding an Int and a Float)
+I also tested of both arguments had the same type (with the alrady included check_type_equal(t1, t2, e)). Later this will be extended to
+allow floats and int in cross type operations.
+
+
+Extending the semantics of the interpreter was straight forward again.
+
+After this all test files could be interepreted and the interpreter was extended to support floating points.
+
+\subsection{Extending the compiler to take literals through the whole pipeline}
+
+To be implemented !
+
+
+
+\begin{itemize}
+\item created half a dozen of test files which include floats in the programs the interpreter has to run
+\item parser: extend ast_1_python to have accept floats
+\item parser: just add cases for where the python parser returns float is accepted.
+\item parser: add a case for float variable annotation (e.g a : float = 3.14)
+\item type_checker: extend types_.py to have a TFloat() dataclass (just boilerplate code)
+\item type_checker: hardcoded TInt() in various places, exchange for either TInt() or TFloat()
+\item type_checker: changed hardcoded check_type_equal(x, TInt(), y) in SPrint() to a newly defined function which checks against multiple types one has to give a list with supported types.
+\item type_checker: same for EOP2(): first test if both operands are equal type and then if they are in the allowed types (maybe ommit the equal types or find a way to do float / int later on)
+\item type_checker: UnaryOp had to be adjusted as well
+\item type_checker: has to return the type of t1 and not TInt() flat in case operation was done on floats
+
+\item type_checker: checking the floats length, precision and going into double proves harder than anticipated
+\item type_checker: different approaches tested: Only where binary representation fits perfectly into 32 bits (but doesnt allow numbers like 0.1 or 3.14)
+\item type_checker: allowing similar but this doesnt give a warning if precision is omitted
+\item type_checker: parsing back into a string, check how many significant digits there are and if more than 7 complain or use double later on
+\item type_checker: last approach doesnt work for doubles because the python parser already ommitts eny digits after the allowed precision of doubles
+\item type_checker: edge cases exist where even our float checker wont catch that (e.g. 3.1000000000000000000000000000000000000000000000001 cuts to 3.1)
+
+\item note: I asked gemini for ways to test and functions to use. I learned about the ways and function and wrote them myself afterwards
+
+\item semantics: had to add float(x1) and float(x2) to the allowed types for eop2 operations
 \end{itemize}

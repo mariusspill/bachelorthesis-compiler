@@ -1,4 +1,7 @@
 from dataclasses import dataclass
+import struct
+from math import isinf, isclose
+from decimal import Decimal
 
 from ast_1_python import *
 from util.immutable_list import IList
@@ -132,12 +135,13 @@ def type_check_expr(ctx: TCtx, e: Expr) -> Type:
                     else:
                         return TInt()
                 case float(_):
-                    # TODO: check size of float for 32 or 64 bit like ints (probably rather 32 bits to fit into f registers)
-                    if False:
-                        pass
-                        # raise TypeError{f"Float constant {x} is too large for 32bit."}
-                    else:
-                        return TFloat()
+                    if isinf(x):
+                        raise TypeError(f"Float constant {x} is too large for 64bit")
+                    if abs(x) > 3.4028235e38:
+                        raise TypeError(f"Float constant {x} is too large for 32bit.")
+                    # Will have to be rounded later
+                    return TFloat()
+
         case EVar(x):
             if x in ctx:
                 return ctx[x]
@@ -147,8 +151,8 @@ def type_check_expr(ctx: TCtx, e: Expr) -> Type:
             te = type_check_expr(ctx, e)
             match op:
                 case "-":
-                    check_type_equal(te, TInt(), e)
-                    return TInt()
+                    check_types_supported(te, [TInt(), TFloat()], e)
+                    return te
                 case "not":
                     check_type_equal(te, TBool(), e)
                     return TBool()

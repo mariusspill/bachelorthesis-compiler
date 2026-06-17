@@ -1,0 +1,273 @@
+# infer type of an expression        
+def type_check_expr(ctx: TCtx, e: Expr) -> Type:
+    match e:
+        case EConst(x):
+            match x:
+                case None:
+                    return TNone()
+                case bool(_):
+                    return TBool()
+                case int(_):
+                    if x >= 2 ** 62 or x < -(2 ** 62):
+                        raise TypeError(f"Integer constant {x} is too large for 63bit.")
+                    else:
+                        return TInt()
+                case float(_):
+                    if isinf(x):
+                        raise TypeError(f"Float constant {x} is too large for 64bit")
+                    else:
+                        if abs(x) > 3.4028235e38:
+                            # Could convert into double here
+                            raise TypeError(f"Float constant {x} is too large for 32bit.")
+                        else:
+                            f32 = struct.unpack('f', struct.pack('f', x))[0]
+                            if x == f32:
+                                return TFloat()
+                            else:
+                                # Could convert into double here
+                                if isclose(x, f32, rel_tol=0.01):
+                                    print(f32, "is", x)
+                                    raise TypeError(f"Error case 1")
+                                else:
+                                    raise TypeError(f"Float lost precision.")
+        case EVar(x):
+            if x in ctx:
+                return ctx[x]
+            else:
+                raise TypeError(f"Undefined variable {x}.")
+        case EOp1(op, e):
+            te = type_check_expr(ctx, e)
+            match op:
+                case "-":
+                    check_types_supported(te, [TInt(), TFloat()], e)
+                    return te
+                case "not":
+                    check_type_equal(te, TBool(), e)
+                    return TBool()
+        case EOp2(e1, op, e2):
+            t1 = type_check_expr(ctx, e1)
+            t2 = type_check_expr(ctx, e2)
+
+            if type(t1) is TTuple or type(t2) is TTuple:
+                match op:
+                    case "is":
+                        check_type_equal(t1, t2, e)
+                        return TBool()
+                    case _:
+                        raise TypeError(f"Operator '{op}' is not supported for tuples.")
+            match op:
+                case "+" | "-":
+                    check_type_equal(t1, t2, e)
+                    check_types_supported(t1, [TInt(), TFloat()], e1)
+                    check_types_supported(t2, [TInt(), TFloat()], e2)
+                    return t1
+                case "==" | "!=":
+                    check_type_equal(t1, t2, e)
+                    return TBool()
+                case "<=" | "<" | ">" | ">=":
+                    check_type_equal(t1, t2, e)
+                    check_types_supported(t1, [TInt(), TFloat()], e1)
+                    check_types_supported(t2, [TInt(), TFloat()], e2)
+                    return TBool()
+                case "and" | "or":
+                    check_type_equal(t1, TBool(), e1)
+                    check_type_equal(t2, TBool(), e2)
+                    return TBool()
+                case "is":
+                    raise TypeError("Operator 'is' used on expression of non-tuple type.")
+        case EInput():
+            return TInt()
+        case EIf(test, body, orelse):
+            ttest = type_check_expr(ctx, test)
+            tbody = type_check_expr(ctx, body)
+            torelse = type_check_expr(ctx, orelse)
+            check_type_equal(ttest, TBool(), test)
+            check_type_equal(tbody, torelse, e)
+            return tbody
+        case ETuple(es):
+            return TTuple(IList([type_check_expr(ctx, e) for e in es]))
+        case ETupleAccess(e, i):
+            t = type_check_expr(ctx, e)
+            match t:
+                case TTuple(ts):
+                    if 0 <= i < len(ts):
+                        return ts[i]
+                    else:
+                        raise TypeError(f"Index {i} is out of bounds for tuple of length {len(ts)}.")
+                case t:
+                    raise TypeError(f"Tuple access on non-tuple type {t}.")
+        case ETupleLen(e):
+            t = type_check_expr(ctx, e)
+            match t:
+                case TTuple(ts):
+                    return TInt()
+                case t:
+                    raise TypeError(f"Tuple length used on non-tuple type {t}.")
+        case ECall(f, es):
+            fty = type_check_expr(ctx, f)
+            match fty:
+                case TCallable(arg_tys, res_ty):
+                    if len(es) != len(arg_tys):
+                        raise TypeError(f"Calling function with wrong number of arguments {e}.")
+                    for (e, ty) in zip(es, arg_tys):
+                        check_expr(ctx, e, ty)
+                    return res_ty
+                case t:
+                    raise TypeError(f"Calling non-function type {t}.")
+        case ELambda():
+            raise TypeError(f"Cannot synthesize type of {pretty_expr(e)}")
+        case EField(f, field):
+            ety = type_check_expr(ctx, f)
+            match ety:
+                case TClass(name): 
+                    ty = ctx[Id(f"{name}@type")]
+                    match ty:
+                        case TClass(name, fields):
+                            assert fields is not None, "fields is always set for @type variable in context"
+                            e.idx = [x for x, _ in fields].index(field)
+                            for fld, ty in fields:
+                                if fld == field:
+                                    return ty
+                            raise TypeError(f"Dataclass {name} does not have a field named {field}.")
+                        case _:
+                            # impossible?
+                            raise TypeError(f"Dataclass {name} was not (yet) defined.")
+                case _:
+                    raise TypeError(f"Field access not allwed on non-dataclass {ety}.")
+
+
+
+SECOND VERSION:
+
+# infer type of an expression        
+def type_check_expr(ctx: TCtx, e: Expr) -> Type:
+    match e:
+        case EConst(x):
+            match x:
+                case None:
+                    return TNone()
+                case bool(_):
+                    return TBool()
+                case int(_):
+                    if x >= 2 ** 62 or x < -(2 ** 62):
+                        raise TypeError(f"Integer constant {x} is too large for 63bit.")
+                    else:
+                        return TInt()
+                case float(_):
+                    if isinf(x):
+                        raise TypeError(f"Float constant {x} is too large for 64bit")
+                    else:
+                        if abs(x) > 3.4028235e38:
+                            # Could convert into double here
+                            raise TypeError(f"Float constant {x} is too large for 32bit.")
+                        else:
+                            decstr = str(x) 
+                            if len(decstr.split('.')[1]) > 7:
+                                # Could convert into double here
+                                raise TypeError(f"Float lost precision.")
+                            else:
+                                return TFloat()
+        case EVar(x):
+            if x in ctx:
+                return ctx[x]
+            else:
+                raise TypeError(f"Undefined variable {x}.")
+        case EOp1(op, e):
+            te = type_check_expr(ctx, e)
+            match op:
+                case "-":
+                    check_types_supported(te, [TInt(), TFloat()], e)
+                    return te
+                case "not":
+                    check_type_equal(te, TBool(), e)
+                    return TBool()
+        case EOp2(e1, op, e2):
+            t1 = type_check_expr(ctx, e1)
+            t2 = type_check_expr(ctx, e2)
+
+            if type(t1) is TTuple or type(t2) is TTuple:
+                match op:
+                    case "is":
+                        check_type_equal(t1, t2, e)
+                        return TBool()
+                    case _:
+                        raise TypeError(f"Operator '{op}' is not supported for tuples.")
+            match op:
+                case "+" | "-":
+                    check_type_equal(t1, t2, e)
+                    check_types_supported(t1, [TInt(), TFloat()], e1)
+                    check_types_supported(t2, [TInt(), TFloat()], e2)
+                    return t1
+                case "==" | "!=":
+                    check_type_equal(t1, t2, e)
+                    return TBool()
+                case "<=" | "<" | ">" | ">=":
+                    check_type_equal(t1, t2, e)
+                    check_types_supported(t1, [TInt(), TFloat()], e1)
+                    check_types_supported(t2, [TInt(), TFloat()], e2)
+                    return TBool()
+                case "and" | "or":
+                    check_type_equal(t1, TBool(), e1)
+                    check_type_equal(t2, TBool(), e2)
+                    return TBool()
+                case "is":
+                    raise TypeError("Operator 'is' used on expression of non-tuple type.")
+        case EInput():
+            return TInt()
+        case EIf(test, body, orelse):
+            ttest = type_check_expr(ctx, test)
+            tbody = type_check_expr(ctx, body)
+            torelse = type_check_expr(ctx, orelse)
+            check_type_equal(ttest, TBool(), test)
+            check_type_equal(tbody, torelse, e)
+            return tbody
+        case ETuple(es):
+            return TTuple(IList([type_check_expr(ctx, e) for e in es]))
+        case ETupleAccess(e, i):
+            t = type_check_expr(ctx, e)
+            match t:
+                case TTuple(ts):
+                    if 0 <= i < len(ts):
+                        return ts[i]
+                    else:
+                        raise TypeError(f"Index {i} is out of bounds for tuple of length {len(ts)}.")
+                case t:
+                    raise TypeError(f"Tuple access on non-tuple type {t}.")
+        case ETupleLen(e):
+            t = type_check_expr(ctx, e)
+            match t:
+                case TTuple(ts):
+                    return TInt()
+                case t:
+                    raise TypeError(f"Tuple length used on non-tuple type {t}.")
+        case ECall(f, es):
+            fty = type_check_expr(ctx, f)
+            match fty:
+                case TCallable(arg_tys, res_ty):
+                    if len(es) != len(arg_tys):
+                        raise TypeError(f"Calling function with wrong number of arguments {e}.")
+                    for (e, ty) in zip(es, arg_tys):
+                        check_expr(ctx, e, ty)
+                    return res_ty
+                case t:
+                    raise TypeError(f"Calling non-function type {t}.")
+        case ELambda():
+            raise TypeError(f"Cannot synthesize type of {pretty_expr(e)}")
+        case EField(f, field):
+            ety = type_check_expr(ctx, f)
+            match ety:
+                case TClass(name): 
+                    ty = ctx[Id(f"{name}@type")]
+                    match ty:
+                        case TClass(name, fields):
+                            assert fields is not None, "fields is always set for @type variable in context"
+                            e.idx = [x for x, _ in fields].index(field)
+                            for fld, ty in fields:
+                                if fld == field:
+                                    return ty
+                            raise TypeError(f"Dataclass {name} does not have a field named {field}.")
+                        case _:
+                            # impossible?
+                            raise TypeError(f"Dataclass {name} was not (yet) defined.")
+                case _:
+                    raise TypeError(f"Field access not allwed on non-dataclass {ety}.")
