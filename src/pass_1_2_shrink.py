@@ -68,7 +68,10 @@ def shrink_stmt(s: src.Stmt) -> tgt.Stmt:
 def shrink_expr(e: src.Expr) -> tgt.Expr:
     match e:
         case src.EConst(c):
-            return tgt.EConst(c, '63bit')
+            if isinstance(c, float):
+                return tgt.EConst(c, '64bit')
+            else:
+                return tgt.EConst(c, '63bit')
         case src.EVar(x):
             return tgt.EVar(x)
         case src.EInput():

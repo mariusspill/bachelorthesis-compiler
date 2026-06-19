@@ -137,11 +137,7 @@ def type_check_expr(ctx: TCtx, e: Expr) -> Type:
                 case float(_):
                     if isinf(x):
                         raise TypeError(f"Float constant {x} is too large for 64bit")
-                    if abs(x) > 3.4028235e38:
-                        raise TypeError(f"Float constant {x} is too large for 32bit.")
-                    # Will have to be rounded later
                     return TFloat()
-
         case EVar(x):
             if x in ctx:
                 return ctx[x]
