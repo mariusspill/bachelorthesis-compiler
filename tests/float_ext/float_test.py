@@ -1,3 +1,6 @@
-x = 3.14
+def compute(x: float) -> float:
+    return x + 2.5
 
-print(x)
+a = 3.14
+f = compute
+print(f(a))
