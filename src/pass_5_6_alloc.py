@@ -48,6 +48,36 @@ def alloc_lhs(lhs: src.Lhs) -> tgt.Lhs:
 
 def alloc_expr(e: src.Expr) -> tgt.Expr:
     match e:
+        case src.EConstFloat(c):
+            body: IList[tgt.Stmt] = ilist()
+
+            num_words = 2 # one for the header, one for the float
+            num_bytes = num_words * 8
+
+            # Start a garbage collection if we're out of memory.
+            body += ilist(
+                tgt.SIf(
+                    tgt.EOp2(
+                        tgt.EOp2(tgt.EGlobal('gc_free_ptr'), '+', tgt.EConst(num_bytes, '64bit')),
+                        '<',
+                        tgt.EGlobal('gc_fromspace_end')
+                    ),
+                    ilist(),
+                    ilist(tgt.SCollect(num_words)),
+                )
+            )
+
+            # Allocate space for the float
+            v = Id.fresh("v")
+            body += ilist(tgt.SAssign(tgt.LId(v), tgt.EAllocate(1))) # one because it needs eight bytes (64-bit) for a float or one word
+
+            x = Id.fresh("flt")
+            body += ilist(tgt.SAssign(tgt.LId(x), tgt.EConstFloat(c)))
+
+            body += ilist(tgt.SAssign(tgt.LSubscript(tgt.EVar(v), 0), tgt.EVar(x)))
+
+
+            return tgt.EBegin(body, tgt.EVar(v))
         case src.EConst(c, size):
             return tgt.EConst(c, size)
         case src.EVar(x):

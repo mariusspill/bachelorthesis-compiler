@@ -16,13 +16,17 @@ type Op2 = Literal["+", "-", "==", "!=", "<=", "<", ">", ">=", "and", "or", "is"
 
 # Expressions
 
-type Expr = EConst | EVar | EOp1 | EOp2 | EInput | EIf \
+type Expr = EConst | EConstFloat | EVar | EOp1 | EOp2 | EInput | EIf \
           | ETuple | ETupleAccess | ETupleLen \
           | ECall | ELambda | EField
 
 @dataclass(frozen=True)
 class EConst:
-    value: int | bool | float | None
+    value: int | bool | None
+
+@dataclass(frozen=True)
+class EConstFloat:
+    value: float
 
 @dataclass(frozen=True)
 class EVar:
@@ -180,7 +184,7 @@ def pretty_stmt(s: Stmt) -> str:
 
 def pretty_expr(e: Expr) -> str:
     match e:
-        case EConst(x) | EVar(x):
+        case EConst(x) | EVar(x) | EConstFloat(x):
             return str(x)
         case EOp1(op, e):
             return f"{op} {pretty_expr(e)}"

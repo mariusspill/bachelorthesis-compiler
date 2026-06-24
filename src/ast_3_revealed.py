@@ -17,14 +17,18 @@ type Op2 = Literal["+", "-", "==", "!=", "<=", "<", ">", ">="]
 
 # Expressions
 
-type Expr = EConst | EVar | EOp1 | EOp2 | EInput | EIf \
+type Expr = EConst | EConstFloat | EVar | EOp1 | EOp2 | EInput | EIf \
           | ETuple | ETupleAccess | ETupleLen \
           | ECall | EFunRef | ELambda
 
 @dataclass(frozen=True)
 class EConst:
-    value: int | bool | float | None
+    value: int | bool | None
     size: Literal['64bit', '63bit']
+
+@dataclass(frozen=True)
+class EConstFloat:
+    value: float
 
 @dataclass(frozen=True)
 class EVar:
@@ -167,6 +171,8 @@ def pretty_expr(e: Expr) -> str:
             return str(x)
         case EConst(x, size):
             return str(x) + ("" if size == "64bit" else "°")
+        case EConstFloat(x):
+            return str(x)
         case EOp1(op, e):
             return f"{op} {pretty_expr(e)}"
         case EOp2(e1, op, e2):

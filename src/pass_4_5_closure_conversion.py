@@ -57,6 +57,8 @@ def closure_conv_expr(decls_out: list[tgt.Decl], e: src.Expr) -> tgt.Expr:
     match e:
         case src.EConst(c, size):
             return tgt.EConst(c, size)
+        case src.EConstFloat(c):
+            return tgt.EConstFloat(c)
         case src.EVar(x):
             return tgt.EVar(x)
         case src.EInput():

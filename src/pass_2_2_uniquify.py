@@ -57,6 +57,8 @@ def uniquify_expr(renaming: dict[Id, Id], e: src.Expr) -> tgt.Expr:
     match e:
         case src.EConst(c, size):
             return tgt.EConst(c, size)
+        case src.EConstFloat(c):
+            return tgt.EConstFloat(c)
         case src.EVar(x):
             return tgt.EVar(renaming[x])
         case src.EInput():

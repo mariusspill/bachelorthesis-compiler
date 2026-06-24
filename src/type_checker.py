@@ -134,10 +134,10 @@ def type_check_expr(ctx: TCtx, e: Expr) -> Type:
                         raise TypeError(f"Integer constant {x} is too large for 63bit.")
                     else:
                         return TInt()
-                case float(_):
-                    if isinf(x):
-                        raise TypeError(f"Float constant {x} is too large for 64bit")
-                    return TFloat()
+        case EConstFloat(x):
+            if isinf(x):
+                raise TypeError(f"Float constant {x} is too large for 64bit")
+            return TFloat()
         case EVar(x):
             if x in ctx:
                 return ctx[x]

@@ -1,3 +1,9 @@
 \chapter{Design Architecture}\label{chap:design_architecture}
 AST Extensions: What new node types did you introduce to represent float literals, float primitives, and operators?
 Pass Pipeline Changes: Walk the reader through the compilation pipeline. Which existing passes had to change to propagate float types, and what new passes did you have to insert to deal with float semantics?
+
+\section{Design Philosophy}
+
+The design philosophy was that the features come first and the optimization later. Thats why I decided for 64-bit floats instead of 32-bit floats, for boxing instead of stack spilling for floats because it allows us to have the full functionality first instead of performance optimizations like having raw floats on the stack. Whenever I found the time to do optimizations after the basis features for floats had been implemented I did that. 
+
+First same type only after that parsing ints in cross type operations.

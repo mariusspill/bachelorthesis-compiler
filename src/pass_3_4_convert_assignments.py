@@ -65,6 +65,8 @@ def conv_ass_expr(AF: set[Id], e: src.Expr) -> tgt.Expr:
     match e:
         case src.EConst(c, size):
             return tgt.EConst(c, size)
+        case src.EConstFloat(c):
+            return tgt.EConstFloat(c)
         case src.EVar(x):
             if x in AF:
                 return tgt.ETupleAccess(tgt.EVar(x), 0)
@@ -105,6 +107,8 @@ def free_vars(e: src.Expr) -> set[Id]:
     match e:
         case src.EConst(_, _):
             return set()
+        case src.EConstFloat(_):
+            return set()
         case src.EVar(x):
             return {x}
         case src.EInput():
@@ -137,6 +141,8 @@ def free_vars_list(es: IList[src.Expr]) -> set[Id]:
 def free_in_lambda(e: src.Expr) -> set[Id]:
     match e:
         case src.EConst(_, _):
+            return set()
+        case src.EConstFloat(_):
             return set()
         case src.EVar(_):
             return set()

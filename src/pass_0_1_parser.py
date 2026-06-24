@@ -50,8 +50,10 @@ def map_node(node: ast.AST) -> Any:
             return "not"
         case ast.Is():
             return "is"
-        case ast.Constant(value) if type(value) in (int, bool, float):
+        case ast.Constant(value) if type(value) in (int, bool):
             return EConst(value)
+        case ast.Constant(value) if isinstance(value, float):
+            return EConstFloat(value)
         case ast.Name(id, _):
             if not all([(c.isalnum() or c == "_") for c in id]):
                 raise IllegalName(id)

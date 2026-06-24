@@ -55,6 +55,8 @@ def reveal_expr(funs: set[Id], e: src.Expr) -> tgt.Expr:
     match e:
         case src.EConst(c, size):
             return tgt.EConst(c, size)
+        case src.EConstFloat(c):
+            return tgt.EConstFloat(c)
         case src.EVar(x):
             if x in funs:
                 return tgt.EFunRef(Label(x.name))
