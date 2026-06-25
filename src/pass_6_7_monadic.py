@@ -65,6 +65,8 @@ def monadic_expr(e: src.Expr) -> tuple[IList[tgt.Stmt], tgt.Expr]:
     match e:
         case src.EConst(c, size):
             return ilist(), tgt.EConst(c, size)
+        case src.EConstFloat(c):
+            return ilist(), tgt.EConstFloat(c)
         case src.EVar(x):
             return ilist(), tgt.EVar(x)
         case src.EOp1(op, e):

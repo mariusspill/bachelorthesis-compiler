@@ -20,10 +20,11 @@ type TCtx = dict[Id, Type]
 
 # Type Checking
 
-def type_check(p: Program) -> None:
+def type_check(p: Program) -> TCtx:
     match p:
         case Program(body):
             ctx: TCtx = dict()
+            local_ctxs: TCtx = dict()
             for d in body: 
                 match d:
                     case DFun():
@@ -32,10 +33,14 @@ def type_check(p: Program) -> None:
                 match s:
                     case SClass():
                         type_declare_class(ctx, s)
-                    case DFun():
-                        type_check_def(ctx, s)
+                    case DFun(funcvar,_,_,_):
+                        locctx = type_check_def(ctx, s)
+
+                        local_ctxs[funcvar] = locctx
                     case _:
                         type_check_stmt(ctx, s)
+
+    return local_ctxs
 
 def type_declare_def(ctx: TCtx, d: Decl) -> None:
     match d:
@@ -53,7 +58,7 @@ def type_declare_class(ctx: TCtx, c: SClass) -> None:
             ctx[name] = TCallable(IList([t for _, t in fields]), TClass(name))
             ctx[Id(f"{name}@type")] = TClass(name, fields)
 
-def type_check_def(ctx: TCtx, d: Decl) -> None:
+def type_check_def(ctx: TCtx, d: Decl) -> TCtx:
     match d:
         case DFun(funcvar, parameters, result_type, body):
             type_well_formed(ctx, result_type)
@@ -61,9 +66,12 @@ def type_check_def(ctx: TCtx, d: Decl) -> None:
 
             local_ctx = ctx.copy()
             local_ctx.update(parameters)
+
             local_ctx[Id('@ret')] = result_type
             if not type_check_stmts(local_ctx, body):
                 raise TypeError(f"Function {funcvar} does not return {result_type} on all paths")
+    
+            return local_ctx
 
 def type_check_stmts(ctx: TCtx, ss: IList[Stmt]) -> bool:
     for s in ss:

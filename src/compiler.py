@@ -92,7 +92,7 @@ if verbose:
 if verbose:
     print("\n===== TYPE CHECKING =====\n")
 try:
-    type_check(ast)
+    types = type_check(ast)
 except TypeError as err:
     print(err)
     exit(1)
@@ -107,7 +107,7 @@ if verbose:
 
 if verbose:
     print("\n===== UNIQUIFY =====\n")
-ast = uniquify(ast)
+ast, types = uniquify(ast, types)
 if verbose:
     print(ast_2_shrunk.pretty(ast))
 
@@ -137,7 +137,7 @@ if verbose:
 
 if verbose:
     print("\n===== HEAP ALLOCATION =====\n")
-ast = alloc(ast)
+ast = alloc(ast, types)
 if verbose:
     print(ast_6_alloc.pretty(ast))
 

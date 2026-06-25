@@ -17,12 +17,16 @@ type Op2Comp = Literal["==", "!=", "<=", "<", ">", ">="]
 
 # Atomic Expressions
 
-type ExprAtom = EConst | EVar
+type ExprAtom = EConst | EVar | EConstFloat
 
 @dataclass(frozen=True)
 class EConst:
     value: int | bool | None
     size: Literal['64bit', '63bit']
+
+@dataclass(frozen=True)
+class EConstFloat:
+    value: float
 
 @dataclass(frozen=True)
 class EVar:
@@ -205,6 +209,8 @@ def pretty_expr(e: Expr) -> str:
             return str(x)
         case EConst(x, size):
             return str(x) + ("" if size == "64bit" else "°")
+        case EConstFloat(x):
+            return str(x)
         case EOp1(op, e):
             return f"{op} {pretty_expr(e)}"
         case EOp2Arith(e1, op, e2) | EOp2Comp(e1, op, e2):

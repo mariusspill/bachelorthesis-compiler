@@ -3,8 +3,10 @@ import ast_2_shrunk as tgt
 from identifier import Id
 from util.immutable_list import *
 
-def uniquify(p: src.Program) -> tgt.Program:
+def uniquify(p: src.Program, types: dict) -> tuple[tgt.Program, dict]:
     renaming = {}
+
+    result = IList()
 
     # Keep function names the same
     for d in p:
@@ -12,19 +14,33 @@ def uniquify(p: src.Program) -> tgt.Program:
             case src.DFun(name, _, _):
                 renaming[name] = name
 
-    return IList([uniquify_decl(renaming.copy(), d) for d in p])
+    for d in p:
+        match d:
+            case src.DFun(name, _, _):
+                result += IList([uniquify_decl(renaming.copy(), d, types[name] if name in types.keys() else None)])
+            case _:
+                result += IList([uniquify_decl(renaming.copy(), d, types[name] if name in types.keys() else None)])
 
-def uniquify_decl(renaming: dict[Id, Id], d: src.Decl) -> tgt.Decl:
+    return result, types
+
+def uniquify_decl(renaming: dict[Id, Id], d: src.Decl, types: dict) -> tgt.Decl:
     match d:
         case src.DFun(name, params, body):
             new_params = IList([Id.fresh(x.name) for x in params])
+
+            if types is not None:
+                for i in range(len(params)):
+                    print(types[params[i]])
+                    types[new_params[i]] = types[params[i]]
+                    del(types[params[i]])
+
             renaming |= { x: x_new for (x, x_new) in zip(params, new_params) }
-            return tgt.DFun(name, new_params, uniquify_stmts(renaming, body))
+            return tgt.DFun(name, new_params, uniquify_stmts(renaming, body, types))
 
-def uniquify_stmts(renaming: dict[Id, Id], ss: IList[src.Stmt]) -> IList[tgt.Stmt]:
-    return IList([uniquify_stmt(renaming, s) for s in ss])
+def uniquify_stmts(renaming: dict[Id, Id], ss: IList[src.Stmt], types:dict) -> IList[tgt.Stmt]:
+    return IList([uniquify_stmt(renaming, s, types) for s in ss])
 
-def uniquify_stmt(renaming: dict[Id, Id], s: src.Stmt) -> tgt.Stmt:
+def uniquify_stmt(renaming: dict[Id, Id], s: src.Stmt, types: dict) -> tgt.Stmt:
     match s:
         case src.SExpr(e):
             e = uniquify_expr(renaming, e)
@@ -37,6 +53,11 @@ def uniquify_stmt(renaming: dict[Id, Id], s: src.Stmt) -> tgt.Stmt:
                 y = renaming[x]
             else:
                 y = Id.fresh(x.name)
+
+                if types is not None and x in types:
+                    types[y] = types[x]
+                    del(types[x])
+
                 renaming[x] = y
             e = uniquify_expr(renaming, e)
             return tgt.SAssign(y, e)
@@ -53,7 +74,7 @@ def uniquify_stmt(renaming: dict[Id, Id], s: src.Stmt) -> tgt.Stmt:
             e = uniquify_expr(renaming, e)
             return tgt.SReturn(e)
 
-def uniquify_expr(renaming: dict[Id, Id], e: src.Expr) -> tgt.Expr:
+def uniquify_expr(renaming: dict[Id, Id], e: src.Expr, types: dict = None) -> tgt.Expr:
     match e:
         case src.EConst(c, size):
             return tgt.EConst(c, size)
