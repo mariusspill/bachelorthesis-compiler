@@ -38,4 +38,23 @@ In \texttt{semantics.py}, the evaluation rules for binary expressions were simpl
     \item pass\_1\_2\_shrink: Else the pass didnt have to be adjusted for floats (maybe only the ast adding float)
 \end{itemize}
 
+\section{Heap Allocation for Floats}
+
+The decision to box every float carried two practical consequences for the allocation pass. From this pass onwards, a float is represented as a pointer to its box, so any operation that consumes a float must first unbox it to recover the underlying value, and any operation that produces a float must box the result again before it can be stored back on the heap. The difficulty is that the allocation pass must know, for each operand, whether it is a float; otherwise it would apply the arithmetic to the box pointer rather than to the value it points to. The type information needed to make this decision was computed earlier, by the type checker, so the task was to make that information available at this point in the pipeline and to consult it for each operand.
+
+The first step was a function that determines whether a given expression yields a float. Whenever it does, the uniform boxing design dictates that the operand must be unboxed before the operation and, where the operation itself yields a float, boxed again afterwards.
+
+A complication arose for values held inside tuples (and for closures, functions, and objects, which are all represented as tuples at this stage). The type checker does verify the type of every element of a tuple, but that per-element information was not preserved beyond type checking, so by the time the allocation pass ran there was no way to recover whether the element at a given position was a float. The expression's shape alone is sufficient for literals and for nested arithmetic, but not for accesses into a tuple or for plain variables, where the type is not visible in the expression itself. To resolve this, I returned to the type checker and preserved the type information it had already derived.
+
+\subsection{A Dictionary to Preserve Type Information}
+
+The result was a dictionary that, for each such structure, uses its identifier as the key and stores its fields or elements together with their corresponding types as the value. This dictionary is returned from the type checker to the main compiler driver, stored there, and passed on to every pass that requires it.
+
+Up to this point in the pipeline, two passes consume the dictionary. The first is uniquify, which renames variables and must therefore update the dictionary's keys so that the recorded types remain reachable under the new names. The second is the heap allocator, for which the dictionary was originally introduced, where it is used to decide whether a given element is a float.
+
+\subsection{Handling Floats inside the Heap Allocator}
+
+When one or more operands of an operation are floats, the allocator emits a block that first extracts each float value from its box, then performs the operation on the unboxed values, and finally, where the result is itself a float, stores it back into a freshly allocated box. When none of the operands are floats, the operation is emitted unchanged, exactly as before.
+\section{Next section}
+
 To be implemented !

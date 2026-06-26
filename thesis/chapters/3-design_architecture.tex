@@ -1,9 +1,58 @@
 \chapter{Design Architecture}\label{chap:design_architecture}
-AST Extensions: What new node types did you introduce to represent float literals, float primitives, and operators?
-Pass Pipeline Changes: Walk the reader through the compilation pipeline. Which existing passes had to change to propagate float types, and what new passes did you have to insert to deal with float semantics?
 
 \section{Design Philosophy}
 
-The design philosophy was that the features come first and the optimization later. Thats why I decided for 64-bit floats instead of 32-bit floats, for boxing instead of stack spilling for floats because it allows us to have the full functionality first instead of performance optimizations like having raw floats on the stack. Whenever I found the time to do optimizations after the basis features for floats had been implemented I did that. 
+The governing principle of this extension was functionality first, optimisation second. This drove two central decisions. First, floats are represented as 64-bit doubles rather than 32-bit single-precision values, in order to preserve fidelity with Python's native semantics. Second, floats are stored as boxed heap objects rather than as raw values, accepting the cost of indirection in exchange for reusing the compiler's existing tuple and garbage-collection machinery. Performance optimisations were deferred until the base functionality for floats was complete, and were only revisited where time allowed.
 
-First same type only after that parsing ints in cross type operations.
+%% =====================================================================
+%% CROSS-TYPE COERCION  (design decided, implementation pending)
+%% If/when int->float coercion is implemented, revise the paragraph
+%% below: change "is currently restricted ... is realised by" tense to
+%% present/past completed, and add a forward reference to the
+%% implementation section describing where the conversion is inserted.
+%% Grep tag: TODO-COERCION
+%% =====================================================================
+A related decision concerns mixed-type arithmetic. Arithmetic is currently restricted to operands of identical type. The chosen design for lifting this restriction is implicit promotion: in any operation mixing an integer and a float, the integer operand is converted to a float before the operation is performed, so that the operation itself always acts on two floats. This keeps a single arithmetic path for floats and confines the type difference to a conversion step at the operands. The implementation of this promotion is pending. % TODO-COERCION
+
+\section{Float Representation on the Heap}
+
+The garbage collector uses bit tagging to distinguish pointers, which it must follow, from raw values, which it must leave untouched. Integers are stored shifted one bit to the left, so that their least-significant bit (LSB) is~0, marking the word as a value the collector should not trace. Heap pointers instead carry an LSB of~1, signalling the collector to follow them. Every structure stored on the heap (tuples, closures, and so on) is laid out as a block of words prefixed by a header word.
+
+A double in the IEEE-754 format cannot be tagged in this way, because all 64~bits are needed to encode the value, leaving no bit free for a tag. Worse, the bit that serves as the tag for integers corresponds, in a double, to part of the mantissa; repurposing it would distort the value entirely.
+
+Floats must nonetheless be storable on the heap, since the language permits them as fields of objects, as function arguments, and as elements of tuples. Restricting the language to avoid this was rejected on principle, as the guiding philosophy stated above places functionality over performance. A representation compatible with the existing tagged collector was therefore required.
+
+\subsection{Alternatives}
+
+One option would have been to store floats as raw values directly on the heap. This would require overhauling the garbage collector to move away from bit tagging towards a layout map, that is, a description of the heap that records, for each structure, which words are pointers and which are raw values. Such a scheme would offer a scalable and memory-efficient way to represent any value directly on the heap, and would allow values to be stored inside any other structure without indirection. The drawback is that it conflicts with the architecture of the compiler as built so far, and that constructing and maintaining layout maps would introduce considerable overhead.
+
+The approach I chose instead was to box every float inside a two-word heap block: one header word and one word holding the value of the float. The header identifies the block as a boxed float. This yields a uniform representation that can be used for literals, for variables, and for floats nested in any heap structure, all through the same interface.
+
+%% =====================================================================
+%% GC HEADER-AWARE TRAVERSAL  (functional gap, implementation pending)
+%% If/when the collector is made header-aware so it copies a float box's
+%% payload verbatim, do BOTH of the following:
+%%   (1) replace the sentence below ("The intended behaviour ... not yet
+%%       in place.") with a present-tense description of how the header
+%%       lets the collector skip scanning the payload word; and
+%%   (2) delete the dedicated soundness-gap paragraph at the end of
+%%       "Possible Improvements" (tagged TODO-GC there), since the gap
+%%       will no longer exist.
+%% Grep tag: TODO-GC
+%% =====================================================================
+The intended behaviour is for the collector to recognise a boxed float from its header and to copy the payload word verbatim, without interpreting those raw bits as a pointer. As discussed in Section~\ref{sec:possible-improvements}, this header-aware handling is not yet in place. % TODO-GC
+
+The advantage of boxing is that it offers a uniform design that delivers full functionality with little overhead and fits almost seamlessly into the existing compiler. The disadvantage is the inefficiency that arises from having to reach inside the box on every access to the value, and from allocating a fresh box for every float that is produced, which increases pressure on the collector. These costs were judged acceptable, since the trade-off aligned with the design philosophy of providing functionality before performance.
+
+\subsection{Possible Improvements}\label{sec:possible-improvements}
+
+Efficiency could be improved by replacing bit tagging with a full layout or type map, which would permit storing raw floats directly on the heap rather than boxing them. Complementarily, the register allocator could be extended to distinguish floats from integers and to maintain a separate region of the stack for floating-point values, so that raw floats could be spilled to the stack just like integers, instead of being boxed and sent to the heap.
+
+%% =====================================================================
+%% GC SOUNDNESS GAP  (functional gap, implementation pending)
+%% This entire paragraph describes a bug that exists ONLY while the
+%% collector is not header-aware. When TODO-GC is implemented, DELETE
+%% this whole paragraph.
+%% Grep tag: TODO-GC
+%% =====================================================================
+Independently of performance, the boxing scheme is not yet fully sound under the copying collector. After an object is copied, the collector scans each of its words and tests the LSB to decide whether the word is a pointer to follow. Because a boxed float's payload is a raw 64-bit double, a value whose low bit happens to be~1 would be misinterpreted as a tagged pointer and erroneously followed. Making boxing correct therefore requires the header-aware traversal described above, so that the payload word of a float box is copied verbatim and never scanned as a pointer. % TODO-GC
