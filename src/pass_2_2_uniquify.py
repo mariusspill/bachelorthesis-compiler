@@ -30,7 +30,6 @@ def uniquify_decl(renaming: dict[Id, Id], d: src.Decl, types: dict) -> tgt.Decl:
 
             if types is not None:
                 for i in range(len(params)):
-                    print(types[params[i]])
                     types[new_params[i]] = types[params[i]]
                     del(types[params[i]])
 

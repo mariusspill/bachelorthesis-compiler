@@ -89,66 +89,106 @@ def alloc_expr(e: src.Expr, types: dict) -> tgt.Expr:
             return tgt.EInput()
         case src.EOp1(op, e1):
             e1_out = alloc_expr(e1, types)
-            match e1_out:
-                case tgt.EBegin(ss, e):
-                    body: IList[tgt.Stmt] = ilist()
-                    for s in ss:
-                        match s:
-                            case tgt.SAssign(lhs, tgt.EConstFloat(c)):
-                                body += ilist(tgt.SAssign(lhs, tgt.EOp1(op, tgt.EConstFloat(c))))
-                            case _:
-                                body += ilist(s)
-                    return tgt.EBegin(body, e)
-                case _:
-                    return tgt.EOp1(op, e1_out)
+
+            isf1 = is_float(e1, types)
+
+            if isf1:
+
+                num_words = 2
+                num_bytes = num_words * 8
+
+                body: IList[tgt.Stmt] = ilist()
+
+                t1 = Id.fresh("flt")
+                body += ilist(tgt.SAssign(tgt.LId(t1), e1_out))
+                unboxed1 = tgt.ETupleAccess(tgt.EVar(t1), 0)
+
+                
+
+                # Start a garbage collection if we're out of memory.
+                body += ilist(
+                    tgt.SIf(
+                        tgt.EOp2(
+                            tgt.EOp2(tgt.EGlobal('gc_free_ptr'), '+', tgt.EConst(num_bytes, '64bit')),
+                            '<',
+                            tgt.EGlobal('gc_fromspace_end')
+                        ),
+                        ilist(),
+                        ilist(tgt.SCollect(num_words)),
+                    )
+                )
+
+                # Allocate space for the tuple
+                v = Id.fresh("v")
+                body += ilist(tgt.SAssign(tgt.LId(v), tgt.EAllocate(1)))
+
+
+                x = Id.fresh("flt")
+                body += ilist(tgt.SAssign(tgt.LId(x), tgt.EOp1(op, unboxed1)))
+
+                body += ilist(tgt.SAssign(tgt.LSubscript(tgt.EVar(v), 0), tgt.EVar(x)))
+
+                return tgt.EBegin(body, tgt.EVar(v))
+            else:
+                return tgt.EOp1(op, e1_out) 
         case src.EOp2(e1, op, e2):
             e1_out = alloc_expr(e1, types)
             e2_out = alloc_expr(e2, types)
 
-            match e1_out, e2_out:
-                case tgt.ETupleAccess(tgt.EVar(e1), r1), tgt.ETupleAccess(tgt.EVar(e2), r2):
-                    if isinstance(types[e1].ts[r1], TFloat) and isinstance(types[e2].ts[r2], TFloat):
-                        unboxed1 = tgt.ETupleAccess(e1_out, 0)
-                        unboxed2 = tgt.ETupleAccess(e2_out, 0)
+            body: IList[tgt.Stmt] = ilist()
 
-                        body: IList[tgt.Stmt] = ilist()
+            isf1 = is_float(e1, types)
+            isf2 = is_float(e2, types)
 
-                        num_words = 2 # one for the header, one for the float
-                        num_bytes = num_words * 8
+            if isf1 or isf2:
+                num_words = 2 # one for the header, one for the float
+                num_bytes = num_words * 8
 
-                        # Start a garbage collection if we're out of memory.
-                        body += ilist(
-                            tgt.SIf(
-                                tgt.EOp2(
-                                    tgt.EOp2(tgt.EGlobal('gc_free_ptr'), '+', tgt.EConst(num_bytes, '64bit')),
-                                    '<',
-                                    tgt.EGlobal('gc_fromspace_end')
-                                ),
-                                ilist(),
-                                ilist(tgt.SCollect(num_words)),
-                            )
+                if isf1:
+                    t1 = Id.fresh("flt")
+                    body += ilist(tgt.SAssign(tgt.LId(t1), e1_out))
+                    unboxed1 = tgt.ETupleAccess(tgt.EVar(t1), 0)
+                else:
+                    unboxed1 = e1_out
+
+                if isf2:
+                    t2 = Id.fresh("flt")
+                    body += ilist(tgt.SAssign(tgt.LId(t2), e2_out))
+                    unboxed2 = tgt.ETupleAccess(tgt.EVar(t2), 0)
+                else:
+                    unboxed2 = e2_out
+
+                if op == '+' or op == '-':
+                    # Start a garbage collection if we're out of memory.
+                    body += ilist(
+                        tgt.SIf(
+                            tgt.EOp2(
+                                tgt.EOp2(tgt.EGlobal('gc_free_ptr'), '+', tgt.EConst(num_bytes, '64bit')),
+                                '<',
+                                tgt.EGlobal('gc_fromspace_end')
+                            ),
+                            ilist(),
+                            ilist(tgt.SCollect(num_words)),
                         )
+                    )
 
-                        # Allocate space for the float
-                        v = Id.fresh("v")
-                        body += ilist(tgt.SAssign(tgt.LId(v), tgt.EAllocate(1))) # one because it needs eight bytes (64-bit) for a float or one word
+                    # Allocate space for the tuple
+                    v = Id.fresh("v")
+                    body += ilist(tgt.SAssign(tgt.LId(v), tgt.EAllocate(1)))
 
-                        x = Id.fresh("flt")
-                        body += ilist(tgt.SAssign(tgt.LId(x), tgt.EOp2(unboxed1, op, unboxed2)))
 
-                        body += ilist(tgt.SAssign(tgt.LSubscript(tgt.EVar(v), 0), tgt.EVar(x)))
+                    x = Id.fresh("flt")
+                    body += ilist(tgt.SAssign(tgt.LId(x), tgt.EOp2(unboxed1, op, unboxed2)))
 
-                        return tgt.EBegin(body, tgt.EVar(v)) 
-                case tgt.ETupleAccess(tgt.EVar(e1), r1), _:
-                    if isinstance(types[e1].ts[r1], TFloat):
-                        body: IList[tgt.Stmt] = ilist()
-                        print("First is boxed")
-                case  _ ,tgt.ETupleAccess(tgt.EVar(e2), r2):
-                    if isinstance(types[e2].ts[r2], TFloat):
-                        body: IList[tgt.Stmt] = ilist()
-                        print("Second is boxed")
-                case _:
-                    return tgt.EOp2(e1_out, op, e2_out)
+                    body += ilist(tgt.SAssign(tgt.LSubscript(tgt.EVar(v), 0), tgt.EVar(x)))
+
+                    return tgt.EBegin(body, tgt.EVar(v))
+                else:
+                    # Return a boolean that doesnt have to be boxed
+                    return tgt.EBegin(body, tgt.EOp2(unboxed1, op, unboxed2))
+            else:
+                return tgt.EOp2(e1_out, op, e2_out)
+
         case src.EIf(e1, e2, e3):
             e1_out = alloc_expr(e1, types)
             e2_out = alloc_expr(e2, types)
@@ -208,3 +248,16 @@ def alloc_expr(e: src.Expr, types: dict) -> tgt.Expr:
 def alloc_exprs(es: IList[src.Expr], types: dict) -> IList[tgt.Expr]:
     return IList([alloc_expr(e, types) for e in es])
 
+
+def is_float(e: src.Expr, types: dict) -> bool:
+    match e:
+        case src.EConstFloat(c):
+            return True
+        case src.ETupleAccess(src.EVar(v), i):
+            return isinstance(types[v].ts[i], TFloat)
+        case src.EOp2(a, ('+' | '-'), b):
+            return is_float(a, types) or is_float(b, types)
+        case src.EOp1('-', a):
+            return is_float(a, types)
+        case _:
+            return False
