@@ -15,7 +15,9 @@ def select(p: src.Program, types: dict) -> tgt.Program:
 def select_decl(d: src.Decl, types: dict) -> tgt.Function:
     match d:
         case src.DFun(label, params, start_label, end_label, body):
+            # extract name of the function
             matching_key = next((k for k in types if k.name == label.label), None)
+            # get entry with the functions scope
             local_types = types[matching_key] if matching_key is not None else {}
             out: tgt.Blocks = {}
             for label_, block in body.items():

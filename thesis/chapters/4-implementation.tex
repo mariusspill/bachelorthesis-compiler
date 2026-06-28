@@ -3,7 +3,7 @@
 % Type Typing/Checking: How does your compiler catch type mismatches (e.g., trying to add an integer to a float if implicit casting isn't supported)?
 % Runtime/Backend Integration: If there is a runtime system or specific assembly/IR emitted (like x86 SSE registers or LLVM float primitives), explain how you lowered the AST nodes to it.
 
-The integration of floating-point operations requires a full-vertical extension across the compiler pipeline. This chapter details the engineering semantics, type systems, and lowering mechanisms required to support 64-bit double-precision floats within a base 32-bit architecture.
+The integration of floating-point operations requires a full-vertical extension across the compiler pipeline. This chapter details the type systems, lowering mechanisms, and code generation required to support 64-bit double-precision floats within the RV64GC architecture.
 
 \section{Interpreter Extension and Phase-Driven Design}
 
@@ -17,18 +17,18 @@ Extending the interpreter required systematic modifications across three core su
 Extending the frontend parser was highly deterministic because the host language's \texttt{ast} module natively recognizes floating-point tokens. The internal AST grammar definition was upgraded to allow literal expression nodes (\texttt{EConst}) to hold float primitives alongside integers. Additionally, the type-mapping routines were extended to recognize and propagate explicit variable type annotations, allowing patterns such as \texttt{a : float = 3.14} to pass successfully through the front-end token stream.
 
 \subsection{Static Semantics and the 64-Bit Precision Decision}
-The primary design challenge emerged during the static analysis phase within the type-checking subsystem. Because the compiler targets a 32-bit RISC-V architecture (RV32), implementing 32-bit single-precision floats (the RISC-V "F" extension) would have offered significant implementation expediency; 32-bit floats map cleanly to standard 32-bit stack slots and integer register pairs. 
+The primary design challenge emerged during the static analysis phase within the type-checking subsystem. Because the compiler targets the RV64GC architecture—which natively supports both single-precision ('F') and double-precision ('D') floating-point extensions—implementing 32-bit floats offered tempting advantages in implementation expediency, specifically minimizing heap pressure and reducing the footprint of boxed values. However, forcing a 32-bit representation would introduce semantic drift from standard Python behavior, which treats all floating-point numbers as 64-bit doubles; common decimals like \texttt{0.1} or \texttt{3.14} would suffer silent precision loss. This directly conflicts with the design philosophy established in Chapter~\ref{chap:design_architecture}, which prioritises preserving Python's semantics over efficiency and implementation simplicity.
 
-However, architectural integrity took precedence over implementation simplicity. Python natively treats all floating-point numbers as 64-bit doubles. Forcing a static 32-bit truncation at the type-checker level would introduce severe semantic drift from standard Python behavior, causing silent precision loss on common practical decimals like \texttt{0.1} or \texttt{3.14}. 
+A hybrid architecture—selectively flagging exact base-2 powers (e.g., $0.5 = 2^{-1}$) as 32-bit floats and remaining decimals as 64-bit doubles—was also explored and rejected for the same reason: Python does not expose mixed-precision literals, and forcing such a distinction would create an un-Pythonic dialect while introducing significant complexity into the code generator.
 
-A hybrid architecture—selectively flagging exact base-2 powers (e.g., $0.5 = 2^{-1}$) as 32-bit floats and fallback decimals as 64-bit doubles—was also explored and ultimately rejected. Python does not natively support or expose mixed-precision literals; forcing such an abstraction would create an un-Pythonic dialect. Furthermore, it would introduce significant complexity into the backend code generator, requiring exhaustive permutations of type-coercion routines and hardware conversion instructions for cross-type arithmetic operations. To preserve strict language fidelity, a unified 64-bit double-precision model was selected, targeting the RISC-V Double-Precision ("D") extension. Consequently, the type validator was designed to enforce a single constraint: verifying that literals do not exceed the 64-bit IEEE 754 infinity threshold.
+To preserve strict semantic fidelity, I opted for a unified 64-bit double-precision model targeting the RISC-V 'D' extension, accepting the trade-off of higher memory overhead. Consequently, the type validator enforces a single constraint: verifying that literals do not exceed the 64-bit IEEE 754 infinity threshold.
 
 \subsection{Type-System Generalization}
 Beyond validating literals, the type-checker's expression evaluation routines needed a clean refactoring. Originally, the compiler assumed almost everything was an integer, evaluating binary operators and functions like \texttt{print()} by checking them directly against a hardcoded \texttt{TInt()} type.
 To support floating-point numbers without copying and pasting the same validation logic everywhere, this rigid approach was replaced with a more flexible system. A new helper function, \texttt{check\_types\_supported}, was introduced to validate expressions against a list of acceptable types instead of just one. For this first iteration, operands must still match exactly—meaning mixed-type operations like \texttt{float + int} are blocked for now. However, this refactor ensures that expressions evaluate to and return their correct type primitive (like \texttt{TFloat()}) rather than defaulting to an integer, laying the clean groundwork for future cross-type arithmetic.
 
 \subsection{Interpreter Semantics}
-Extending the runtime behavior in the interpreter was the most straightforward step because the interpreter itself is written in Python. Since the host language already supports 64-bit floating-point math natively.
+Extending the runtime behavior in the interpreter was the most straightforward step because the interpreter itself is written in Python, which already supports 64-bit floating-point math natively.
 
 In \texttt{semantics.py}, the evaluation rules for binary expressions were simply updated to accept float values alongside integers. When the interpreter encounters an operation like addition, it handles the AST nodes by passing the raw values directly to Python's native operators. By leveraging the host language's execution environment this way, the interpreter was immediately able to run the floating-point test suite with perfect accuracy.
 \section{Extending the compiler to take literals through the whole pipeline}
@@ -55,6 +55,43 @@ Up to this point in the pipeline, two passes consume the dictionary. The first i
 \subsection{Handling Floats inside the Heap Allocator}
 
 When one or more operands of an operation are floats, the allocator emits a block that first extracts each float value from its box, then performs the operation on the unboxed values, and finally, where the result is itself a float, stores it back into a freshly allocated box. When none of the operands are floats, the operation is emitted unchanged, exactly as before.
-\section{Next section}
 
-To be implemented !
+
+\section{Float Literal Support End to End}
+
+With the heap-based boxing design fully implemented, the next task was to support float literals through the entire compiler pipeline, from instruction selection down to executable assembly. The test program \texttt{float\_literal.py} (see Appendix) served as the target: it assigns a float literal to a variable and prints it.
+
+\subsection{Instruction Selection}
+
+The first pass that required modifications was instruction selection. As a prerequisite, I extended the register library to include all 32 floating-point registers defined by RISC-V (see Appendix): the temporary registers \texttt{ft0}--\texttt{ft11}, the saved registers \texttt{fs0}--\texttt{fs11}, and the argument registers \texttt{fa0}--\texttt{fa7}. Under the boxed-float strategy most of these registers are not yet used, since every float value resides on the heap and is only loaded into a register for a single operation before being stored back. Nonetheless, defining the full register set lays the groundwork for future optimisations such as keeping floats in registers across operations or spilling to the stack instead of the heap.
+
+Inside the pass itself, I threaded the types dictionary from the compiler driver down to instruction selection so that the pass could determine whether a value should be directed to a floating-point register or an integer register. Accessing a boxed float requires unboxing: loading from byte offset~7 of the tagged heap pointer to reach the payload field of the box.
+
+\subsection{Patch Instructions for Literals}
+
+The final pass that required changes was patch instructions, which lowers abstract move operations into concrete RISC-V assembly. To support this, I first extended the RISC-V AST with a new instruction node for floating-point moves. RISC-V provides three variants: \texttt{fmv.d.x} (integer register to float register), \texttt{fmv.x.d} (float register to integer register), and \texttt{fmv.d} (float register to float register). I defined all three in the AST.
+
+Inside the pass, when a move instruction is encountered, I introduced a four-way case distinction based on whether the source and destination are floating-point or integer registers. Each combination selects the appropriate move instruction: \texttt{fmv.d} when both are float registers, \texttt{fmv.d.x} when only the destination is a float register, \texttt{fmv.x.d} when only the source is a float register, and the standard integer \texttt{add} (used as a move) when neither is.
+
+\subsection{Extension of the Runtime}
+
+To support printing floats, I added a \texttt{print\_float} function to the C runtime (\texttt{runtime.c}). This function receives a double-precision value in \texttt{fa0}---following the RISC-V calling convention for floating-point arguments---and prints it using \texttt{printf}. This mirrors the existing \texttt{print\_int64} function that the base compiler uses for integers.
+
+\subsection{Walkthrough of the Generated Assembly}
+
+To illustrate the end-to-end mechanics, consider how the compiler handles the statement \texttt{a: float = 3.14}. The float value is converted to its IEEE~754 bit representation as a 64-bit integer and loaded into an integer register using \texttt{li}. It is then stored at byte offset~7 from the tagged heap pointer, which places it in the payload field of the box:
+
+\begin{lstlisting}
+    li      a2, 4614253070214989087
+    add     t0, zero, a2
+    sd      t0, 7(a1)
+\end{lstlisting}
+
+When the program calls \texttt{print(a)}, the compiler emits instructions to unbox the float: it loads the raw bits from the heap back into an integer register, then uses \texttt{fmv.d.x} to reinterpret those bits as a double-precision value in the floating-point register \texttt{fa0}, and finally calls the runtime's \texttt{print\_float}:
+
+\begin{lstlisting}
+    ld      a1, 7(a1)
+    fmv.d.x fa0, a1
+    call    print_float
+\end{lstlisting}
+
