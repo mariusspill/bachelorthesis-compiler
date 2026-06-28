@@ -31,12 +31,6 @@ To support floating-point numbers without copying and pasting the same validatio
 Extending the runtime behavior in the interpreter was the most straightforward step because the interpreter itself is written in Python, which already supports 64-bit floating-point math natively.
 
 In \texttt{semantics.py}, the evaluation rules for binary expressions were simply updated to accept float values alongside integers. When the interpreter encounters an operation like addition, it handles the AST nodes by passing the raw values directly to Python's native operators. By leveraging the host language's execution environment this way, the interpreter was immediately able to run the floating-point test suite with perfect accuracy.
-\section{Extending the compiler to take literals through the whole pipeline}
-
-\begin{itemize}
-    \item pass\_1\_2\_shrink: Had to add a 64-bit flag if constant is flow so down the line its exact ieee structure isnt lost.
-    \item pass\_1\_2\_shrink: Else the pass didnt have to be adjusted for floats (maybe only the ast adding float)
-\end{itemize}
 
 \section{Heap Allocation for Floats}
 
