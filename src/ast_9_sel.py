@@ -14,6 +14,11 @@ class Const:
     value: int
     size: Literal['63bit', '64bit']
 
+
+@dataclass
+class ConstFloat:
+    value: float
+
 # Memory access
 
 @dataclass(frozen=True)
@@ -24,7 +29,7 @@ class Offset:
 # Arguments
 
 type ArgWrite = Id | Register | Offset
-type ArgRead = ArgWrite | Label | Const
+type ArgRead = ArgWrite | Label | Const | ConstFloat
 
 # Instructions
 
@@ -122,6 +127,8 @@ def pretty_arg(a: ArgRead) -> str:
             return r
         case Const(x, size):
             return str(x) + ("" if size == "64bit" else "°")
+        case ConstFloat(x):
+            return str(x)
         case Offset(r, o):
             return f"{o}({pretty_arg(r)})"
         case Label(l):

@@ -9,6 +9,11 @@ class Register:
         "zero", "ra", "sp", "gp", "tp", "t0", "t1", "t2", "fp", "s1", "a0", "a1",
         "a2", "a3", "a4", "a5", "a6", "a7", "s2", "s3", "s4", "s5", "s6", "s7",
         "s8", "s9", "s10", "s11", "t3", "t4", "t5", "t6",
+        "ft0", "ft1", "ft2", "ft3", "ft4", "ft5", "ft6", "ft7",
+        "fs0", "fs1",
+        "fa0", "fa1", "fa2", "fa3", "fa4", "fa5", "fa6", "fa7",
+        "fs2", "fs3", "fs4", "fs5", "fs6", "fs7", "fs8", "fs9", "fs10", "fs11",
+        "ft8", "ft9", "ft10", "ft11"
     ]
     name: Name
 
@@ -47,6 +52,38 @@ t3 = Register("t3")     # temporary register 3
 t4 = Register("t4")     # temporary register 4
 t5 = Register("t5")     # temporary register 5
 t6 = Register("t6")     # temporary register 6
+ft0 = Register("ft0")   # floating-point temporary register 0
+ft1 = Register("ft1")   # floating-point temporary register 1
+ft2 = Register("ft2")   # floating-point temporary register 2
+ft3 = Register("ft3")   # floating-point temporary register 3
+ft4 = Register("ft4")   # floating-point temporary register 4
+ft5 = Register("ft5")   # floating-point temporary register 5
+ft6 = Register("ft6")   # floating-point temporary register 6
+ft7 = Register("ft7")   # floating-point temporary register 7
+fs0 = Register("fs0")   # floating-point saved register 0
+fs1 = Register("fs1")   # floating-point saved register 1
+fa0 = Register("fa0")   # floating-point function argument 0 / return value 0
+fa1 = Register("fa1")   # floating-point function argument 1 / return value 1
+fa2 = Register("fa2")   # floating-point function argument 2
+fa3 = Register("fa3")   # floating-point function argument 3
+fa4 = Register("fa4")   # floating-point function argument 4
+fa5 = Register("fa5")   # floating-point function argument 5
+fa6 = Register("fa6")   # floating-point function argument 6
+fa7 = Register("fa7")   # floating-point function argument 7
+fs2 = Register("fs2")   # floating-point saved register 2
+fs3 = Register("fs3")   # floating-point saved register 3
+fs4 = Register("fs4")   # floating-point saved register 4
+fs5 = Register("fs5")   # floating-point saved register 5
+fs6 = Register("fs6")   # floating-point saved register 6
+fs7 = Register("fs7")   # floating-point saved register 7
+fs8 = Register("fs8")   # floating-point saved register 8
+fs9 = Register("fs9")   # floating-point saved register 9
+fs10 = Register("fs10") # floating-point saved register 10
+fs11 = Register("fs11") # floating-point saved register 11
+ft8 = Register("ft8")   # floating-point temporary register 8
+ft9 = Register("ft9")   # floating-point temporary register 9
+ft10 = Register("ft10") # floating-point temporary register 10
+ft11 = Register("ft11") # floating-point temporary register 11
 
 # a list of all callee saved registers
 CALLEE_SAVED_REGISTERS = ilist(sp, fp, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11)

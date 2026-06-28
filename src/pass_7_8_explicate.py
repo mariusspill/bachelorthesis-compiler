@@ -108,7 +108,7 @@ def explicate_lhs(lhs: src.Lhs) -> tgt.Lhs:
 
 def explicate_expr(e: src.Expr) -> tgt.Expr:
     match e:
-        case src.EVar(_) | src.EConst(_):
+        case src.EVar(_) | src.EConst(_) | src.EConstFloat(_):
             return explicate_atom(e)
         case src.EInput():
             return tgt.EInput()
@@ -149,3 +149,5 @@ def explicate_atom(a: src.ExprAtom) -> tgt.ExprAtom:
             return tgt.EVar(x)
         case src.EConst(x, size):
             return tgt.EConst(x, size)
+        case src.EConstFloat(x):
+            return tgt.EConstFloat(x)

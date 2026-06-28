@@ -25,6 +25,10 @@ class EConst:
     size: Literal['64bit', '63bit']
 
 @dataclass(frozen=True)
+class EConstFloat:
+    value: float
+
+@dataclass(frozen=True)
 class EVar:
     name: Id
 
@@ -216,6 +220,8 @@ def pretty_expr(e: Expr) -> str:
             return str(x)
         case EConst(x, size):
             return str(x) + ("" if size == "64bit" else "°")
+        case EConstFloat(x):
+            return str(x)
         case EOp1("not", e):
             return f"not {pretty_expr(e)}"
         case EOp1(op, e):

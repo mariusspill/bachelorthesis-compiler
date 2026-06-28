@@ -6,16 +6,20 @@ from identifier import Id
 from label import Label
 from register import *
 from util.immutable_list import ilist, IList
+from types_ import *
 
-def select(p: src.Program) -> tgt.Program:
-    return IList([select_decl(d) for d in p])
 
-def select_decl(d: src.Decl) -> tgt.Function:
+def select(p: src.Program, types: dict) -> tgt.Program:
+    return IList([select_decl(d, types) for d in p])
+
+def select_decl(d: src.Decl, types: dict) -> tgt.Function:
     match d:
         case src.DFun(label, params, start_label, end_label, body):
+            matching_key = next((k for k in types if k.name == label.label), None)
+            local_types = types[matching_key] if matching_key is not None else {}
             out: tgt.Blocks = {}
             for label_, block in body.items():
-                out[label_] = select_block(end_label, block)
+                out[label_] = select_block(end_label, block, local_types)
             param_moves = IList([
                 tgt.Move(x, reg)
                 for x, reg in zip(params, FUNCTION_ARG_REGISTERS)
@@ -23,23 +27,36 @@ def select_decl(d: src.Decl) -> tgt.Function:
             out[start_label] = param_moves + out[start_label]
             return tgt.Function(label, start_label, end_label, out)
 
-def select_block(end_label: Label, p: src.Block) -> tgt.Block:
+def select_block(end_label: Label, p: src.Block, types: dict) -> tgt.Block:
     out: tgt.Block = ilist()
     for s in p:
-        out += select_stmt(end_label, s)
+        out += select_stmt(end_label, s, types)
     return out
 
-def select_stmt(end_label: Label, s: src.Stmt) -> IList[tgt.Instr]:
+def select_stmt(end_label: Label, s: src.Stmt, types: dict) -> IList[tgt.Instr]:
     match s:
         case src.SPrint(e):
-            return ilist(
-                tgt.Move(a0, select_atom(e)),
-                # Divide the argument by 2 to remove the tag bit.
-                # Note that right-shifting would cause issues with negative numbers!
-                tgt.Instr2('div', a0, a0, tgt.Const(2, '64bit')),
-                tgt.Call(Label("print_int64"), 1, 'normal'),
-            )
+            atom = select_atom(e)
+            if types[atom] == TFloat():
+                tmp = Id.fresh("tmp")
+                return ilist(                
+                tgt.Move(tmp, tgt.Offset(select_atom(e), 7)),
+                tgt.Move(fa0, tmp),
+                tgt.Call(Label("print_float"), 1, 'normal'),)
+            else:
+                return ilist(
+                    tgt.Move(a0, select_atom(e)),
+                    # Divide the argument by 2 to remove the tag bit.
+                    # Note that right-shifting would cause issues with negative numbers!
+                    tgt.Instr2('div', a0, a0, tgt.Const(2, '64bit')),
+                    tgt.Call(Label("print_int64"), 1, 'normal'),
+                )
         case src.SAssign(lhs, src.EConst(_, _) as e):
+            lhs_out = select_lhs(lhs)
+            return ilist(
+                tgt.Move(lhs_out, select_atom(e))
+            )
+        case src.SAssign(lhs, src.EConstFloat(_) as e):
             lhs_out = select_lhs(lhs)
             return ilist(
                 tgt.Move(lhs_out, select_atom(e))
@@ -249,6 +266,8 @@ def select_lhs(lhs: src.Lhs) -> Id | tgt.Offset:
 
 def select_atom(e: src.ExprAtom) -> tgt.Const | Id:
     match e:
+        case src.EConstFloat(c):
+            return tgt.ConstFloat(c)
         case src.EConst(c, size):
             c = 0 if c is None else int(c)
             return tgt.Const(c, size)

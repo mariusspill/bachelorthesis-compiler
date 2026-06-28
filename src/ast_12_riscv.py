@@ -7,7 +7,9 @@ from util.immutable_list import IList
 
 # Constants
 
-type Const = int
+type Const = int 
+
+type ConstFloat = float
 
 # Offsets
 
@@ -20,7 +22,7 @@ class Offset:
 
 type Instr = Label | Load | LoadAddress | Store | RInstr | IInstr2 | IInstr1 \
            | Call | CallIndirect | Jump | JumpIndirect | Return | Branch \
-           | Directive | Label
+           | Directive | Label | RFMoveInstr
 
 # Assembler Directives
 
@@ -46,6 +48,14 @@ class RInstr:
     rd: Register  # destination register
     rs1: Register  # source register 1
     rs2: Register  # source register 2
+
+type RFMoveName = Literal["fmv.d", "fmv.d.x", "fmv.x.d"]
+
+@dataclass(frozen=True)
+class RFMoveInstr:
+    name: RFMoveName
+    rd: Register
+    rs: Register
 
 # Binary Immediate Instructions
 
@@ -167,6 +177,8 @@ def pretty_instr(i: Instr) -> str:
             return f"\tsd\t{pretty_arg(dst)},{pretty_arg(src)}"
         case RInstr(nm, dst, src1, src2):
             return f"\t{nm}\t{pretty_arg(dst)},{pretty_arg(src1)},{pretty_arg(src2)}"
+        case RFMoveInstr(nm, dst, src):
+            return f"\t{nm}\t{pretty_arg(dst)},{pretty_arg(src)}"
         case IInstr2(nm, dst, src, imm):
             return f"\t{nm}\t{pretty_arg(dst)},{pretty_arg(src)},{pretty_arg(imm)}"
         case IInstr1(nm, dst, imm):

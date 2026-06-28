@@ -67,6 +67,8 @@ def assign_home_src(env: dict[Id, Register | tgt.Offset], arg: src.ArgRead) -> t
     match arg:
         case src.Const(i, size):
             return tgt.Const(i, size)
+        case src.ConstFloat(x):
+            return tgt.ConstFloat(x)
         case Label(l):
             return Label(l)
         case _:

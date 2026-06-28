@@ -40,6 +40,7 @@ def type_check(p: Program) -> TCtx:
                     case _:
                         type_check_stmt(ctx, s)
 
+    local_ctxs[Id("main")] = ctx
     return local_ctxs
 
 def type_declare_def(ctx: TCtx, d: Decl) -> None:

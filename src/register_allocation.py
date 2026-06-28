@@ -62,7 +62,7 @@ def read_set_src_arg(arg: src.ArgRead) -> set[Node]:
             return {arg}
         case src.Offset(arg2, _):
             return read_set_src_arg(arg2)
-        case Label(_) | src.Const(_, _):
+        case Label(_) | src.Const(_, _) | src.ConstFloat(_):
             return set()
 
 # the read set of an argument in write position
@@ -185,7 +185,7 @@ def build_interference_graph(p: src.Blocks, liveness: FunLiveness) -> Undirected
             live_out = liveness[label].instr_out[i]
 
             match instr:
-                case src.Call(Label(l), _) if l not in ["print_int64", "input_int64"]:
+                case src.Call(Label(l), _) if l not in ["print_int64", "input_int64", "print_float", "input_float"]:
                     # Cause all live variables to be spilled during
                     # garbage collection by adding interference with
                     # all registers. User functions are also included

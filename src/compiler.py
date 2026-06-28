@@ -155,7 +155,7 @@ if verbose:
 
 if verbose:
     print("\n===== INSTRUCTION SELECTION =====\n")
-blocks = select(blocks)
+blocks = select(blocks, types)
 if verbose:
     print(ast_9_sel.pretty(blocks))
 

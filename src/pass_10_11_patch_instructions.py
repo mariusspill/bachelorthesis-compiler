@@ -3,6 +3,7 @@ import ast_11_patched as tgt
 from register import *
 from util.immutable_list import IList, ilist
 from label import Label
+import struct 
 
 def patch_instructions(p: src.Program) -> tgt.Program:
     return IList([patch_fun(d) for d in p])
@@ -38,11 +39,20 @@ def patch_instruction(i: src.Instr) -> tgt.Block:
 
             match src_:
                 case src.Register(_):
-                    out += ilist(tgt.RInstr("add", rd, zero, src_))
+                    if is_fp_register(rd) and is_fp_register(src_):
+                        out += ilist(tgt.RFMoveInstr("fmv.d", rd, src_))
+                    elif is_fp_register(rd):
+                        out += ilist(tgt.RFMoveInstr("fmv.d.x", rd, src_))
+                    elif is_fp_register(src_):
+                        out += ilist(tgt.RFMoveInstr("fmv.x.d", rd, src_ ))
+                    else:
+                        out += ilist(tgt.RInstr("add", rd, zero, src_))
                 case src.Offset(_, _):
                     out += patch_load_offset(rd, src_)
                 case src.Const(_, _):
                     out += ilist(tgt.IInstr1("li", rd, patch_const(src_)))
+                case src.ConstFloat(_):
+                    out += ilist(tgt.IInstr1("li", rd, patch_const_float(src_)))
                 case Label(_) as l:
                     out += ilist(tgt.LoadAddress(rd, l))
 
@@ -52,6 +62,9 @@ def patch_instruction(i: src.Instr) -> tgt.Block:
             match src_:
                 case src.Const(_, _) as cnst:
                     out += ilist(tgt.IInstr1("li", t0, patch_const(cnst)))
+                    address = t0
+                case src.ConstFloat(_) as cnst:
+                    out += ilist(tgt.IInstr1("li", t0, patch_const_float(cnst)))
                     address = t0
                 case src.Offset(_, _) as o:
                     out += patch_load_offset(t0, o)
@@ -84,6 +97,9 @@ def patch_instruction(i: src.Instr) -> tgt.Block:
                 case src.Const(_, _):
                     out += ilist(tgt.IInstr1("li", t0, patch_const(src1)))
                     rs1 = t0
+                case src.ConstFloat(_):
+                    out += ilist(tgt.IInstr1("li", t0, patch_const_float(src1)))
+                    rs1 = t0
             match src2:
                 case src.Label(_):
                     out += ilist(tgt.LoadAddress(t1, src2))
@@ -95,6 +111,9 @@ def patch_instruction(i: src.Instr) -> tgt.Block:
                     rs2 = t1
                 case src.Const(_, _):
                     out += ilist(tgt.IInstr1("li", t1, patch_const(src2)))
+                    rs2 = t1
+                case src.ConstFloat(_):
+                    out += ilist(tgt.IInstr1("li", t1, patch_const_float(src2)))
                     rs2 = t1
             out += ilist(tgt.Branch(cc, rs1, rs2, l))
         case src.Instr2(op, dst, src1, src2):
@@ -117,6 +136,9 @@ def patch_instruction(i: src.Instr) -> tgt.Block:
                     rs1 = t0
                 case src.Const(_, _):
                     out += ilist(tgt.IInstr1("li", t0, patch_const(src1)))
+                    rs1 = t0
+                case src.ConstFloat(_):
+                    out += ilist(tgt.IInstr1("li", t0, patch_const_float(src1)))
                     rs1 = t0
 
             match src2:
@@ -141,6 +163,9 @@ def patch_instruction(i: src.Instr) -> tgt.Block:
                     else:
                         out += ilist(tgt.IInstr1("li", t1, c))
                         rs2 = t1
+                case src.ConstFloat(_):
+                    out += ilist(tgt.IInstr1("li", t1, patch_const_float(src2)))
+                    rs2 = t1
             match rs2:
                 case int(_):
                     match op:
@@ -171,6 +196,9 @@ def patch_const(e: src.Const) -> tgt.Const:
             return int(e.value) << 1
         case "64bit":
             return int(e.value)
+        
+def patch_const_float(e: src.ConstFloat) -> tgt.ConstFloat:
+    return struct.unpack('q', struct.pack('d', e.value))[0]
 
 def patch_load_offset(rd: Register, o: src.Offset) -> tgt.Block:
     match o.reg:
@@ -207,3 +235,6 @@ def patch_store_offset(rs: Register, o: src.Offset, rtmp: Register) -> tgt.Block
                 tgt.Store(rs, tgt.Offset(rtmp, o.offset))
             )
             return out
+
+def is_fp_register(r: Register) -> bool:
+    return r.name.startswith("f")

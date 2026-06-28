@@ -10,12 +10,30 @@ void print_int64(int64_t x) {
     printf("%" PRId64 "\n", x);
 }
 
+void print_float(double x) {
+    printf("%f\n", x);
+}
+
 int64_t input_int64() {
     int64_t x;
     int c;
 
     do {
         if (scanf("%" SCNd64, &x) == 1) 
+            break; 
+
+        while ((c = getchar()) != '\n' && c != EOF);
+    } while (1);
+
+    return x;
+}
+
+double input_float() {
+    double x;
+    int c;
+
+    do {
+        if (scanf("%lf", &x) == 1) 
             break; 
 
         while ((c = getchar()) != '\n' && c != EOF);

@@ -69,6 +69,8 @@ def optimize_block(block: src.Block) -> tgt.Block:
                         val_out = val1 >> val2
                 val_out = simulate_over_and_underflow(int(val_out))
                 block_out1 += ilist(src.Move(dst, src.Const(val_out, "64bit")))
+            case src.Instr2(op, dst, src.ConstFloat(v1), src.ConstFloat(v2)):
+                pass
             case src.Instr2(op, dst, src1, src.Const(val1, size1)):
                 val1 = to_int_64(val1, size1)
                 if op in ["add", "sub"] and val1 == 0:
@@ -79,6 +81,8 @@ def optimize_block(block: src.Block) -> tgt.Block:
                     block_out1 += ilist(src.Move(dst, src.Const(0, "64bit")))
                 else:
                     block_out1 += ilist(block[i])
+            case src.Instr2(op, dst, src1, src.ConstFloat(v1)):
+                pass
             case src.Branch(cc, src.Const(val1, size1), src.Const(val2, size2), target):
                 val1 = to_int_64(val1, size1)
                 val2 = to_int_64(val2, size2)
@@ -99,6 +103,8 @@ def optimize_block(block: src.Block) -> tgt.Block:
                         if val1 >= val2:
                             block_out1 += ilist(src.Jump(target))
                             break
+            case src.Branch(cc, src.ConstFloat(val1), src.ConstFloat(val2), target):
+                pass
             case _:
                 block_out1 += ilist(block[i])
         i += 1

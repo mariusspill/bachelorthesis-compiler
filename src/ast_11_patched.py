@@ -8,10 +8,12 @@ import ast_12_riscv as riscv
 
 from ast_12_riscv import (
     Const as Const,
+    ConstFloat as ConstFloat,
     Offset as Offset,
     Directive as Directive,
     DGlobal as DGlobal,
     RInstrName as RInstrName,
+    RFMoveInstr as RFMoveInstr,
     RInstr as RInstr,
     IInstr2 as IInstr2,
     IInstr1 as IInstr1,

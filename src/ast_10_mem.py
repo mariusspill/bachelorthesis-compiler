@@ -13,6 +13,12 @@ class Const:
     value: int
     size: Literal['63bit', '64bit']
 
+# Float Constant
+
+@dataclass
+class ConstFloat:
+    value: float
+
 # Arguments
 
 type ArgWrite = Register | Offset
@@ -128,5 +134,7 @@ def pretty_arg(a: ArgRead) -> str:
             return f"{o}({pretty_arg(ro)})"
         case Const(x, size):
             return str(x) + ("" if size == "64bit" else "°")
+        case ConstFloat(x):
+            return str(x)
         case Label(l):
             return l
