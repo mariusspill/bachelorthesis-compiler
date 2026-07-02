@@ -13,7 +13,7 @@ type Op1 = Literal["-", "not"]
 
 # Binary Operators
 
-type Op2Arith = Literal["+", "-"]
+type Op2Arith = Literal["+", "-", "*", "/"]
 
 # Atomic Expressions
 

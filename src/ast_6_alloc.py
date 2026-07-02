@@ -13,7 +13,7 @@ type Op1 = Literal["-", "not"]
 
 # Binary Operators
 
-type Op2 = Literal["+", "-", "==", "!=", "<=", "<", ">", ">="]
+type Op2 = Literal["+", "-", "*", "/", "==", "!=", "<=", "<", ">", ">="]
 
 # Global Variables
 

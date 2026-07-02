@@ -178,6 +178,11 @@ def type_check_expr(ctx: TCtx, e: Expr) -> Type:
                     check_types_supported(t1, [TInt(), TFloat()], e1)
                     check_types_supported(t2, [TInt(), TFloat()], e2)
                     return t1
+                case "*" | "/":
+                    check_type_equal(t1, t2, e)
+                    check_types_supported(t1, [TFloat()], e1)
+                    check_types_supported(t2, [TFloat()], e2)
+                    return t2
                 case "==" | "!=":
                     check_type_equal(t1, t2, e)
                     return TBool()

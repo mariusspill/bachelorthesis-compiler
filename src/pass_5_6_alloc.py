@@ -74,8 +74,12 @@ def alloc_expr(e: src.Expr, types: dict) -> tgt.Expr:
             v = Id.fresh("v")
             body += ilist(tgt.SAssign(tgt.LId(v), tgt.EAllocate(1))) # one because it needs eight bytes (64-bit) for a float or one word
 
+            types[v] = TFloat()
+
             x = Id.fresh("flt")
             body += ilist(tgt.SAssign(tgt.LId(x), tgt.EConstFloat(c)))
+
+            types[x] = TFloat()
 
             body += ilist(tgt.SAssign(tgt.LSubscript(tgt.EVar(v), 0), tgt.EVar(x)))
 
@@ -100,6 +104,9 @@ def alloc_expr(e: src.Expr, types: dict) -> tgt.Expr:
                 body: IList[tgt.Stmt] = ilist()
 
                 t1 = Id.fresh("flt")
+
+                types[t1] = TFloat()
+
                 body += ilist(tgt.SAssign(tgt.LId(t1), e1_out))
                 unboxed1 = tgt.ETupleAccess(tgt.EVar(t1), 0)
 
@@ -122,9 +129,13 @@ def alloc_expr(e: src.Expr, types: dict) -> tgt.Expr:
                 v = Id.fresh("v")
                 body += ilist(tgt.SAssign(tgt.LId(v), tgt.EAllocate(1)))
 
+                types[v] = TFloat()
+
 
                 x = Id.fresh("flt")
                 body += ilist(tgt.SAssign(tgt.LId(x), tgt.EOp1(op, unboxed1)))
+
+                types[x] = TFloat()
 
                 body += ilist(tgt.SAssign(tgt.LSubscript(tgt.EVar(v), 0), tgt.EVar(x)))
 
@@ -146,6 +157,9 @@ def alloc_expr(e: src.Expr, types: dict) -> tgt.Expr:
 
                 if isf1:
                     t1 = Id.fresh("flt")
+
+                    types[t1] = TFloat()
+
                     body += ilist(tgt.SAssign(tgt.LId(t1), e1_out))
                     unboxed1 = tgt.ETupleAccess(tgt.EVar(t1), 0)
                 else:
@@ -153,12 +167,15 @@ def alloc_expr(e: src.Expr, types: dict) -> tgt.Expr:
 
                 if isf2:
                     t2 = Id.fresh("flt")
+
+                    types[t2] = TFloat()
+
                     body += ilist(tgt.SAssign(tgt.LId(t2), e2_out))
                     unboxed2 = tgt.ETupleAccess(tgt.EVar(t2), 0)
                 else:
                     unboxed2 = e2_out
 
-                if op == '+' or op == '-':
+                if op == '+' or op == '-' or op == '*' or op == '/':
                     # Start a garbage collection if we're out of memory.
                     body += ilist(
                         tgt.SIf(
@@ -174,10 +191,15 @@ def alloc_expr(e: src.Expr, types: dict) -> tgt.Expr:
 
                     # Allocate space for the tuple
                     v = Id.fresh("v")
+
+                    types[v] = TFloat()
+ 
                     body += ilist(tgt.SAssign(tgt.LId(v), tgt.EAllocate(1)))
 
 
                     x = Id.fresh("flt")
+                    types[x] = TFloat()
+
                     body += ilist(tgt.SAssign(tgt.LId(x), tgt.EOp2(unboxed1, op, unboxed2)))
 
                     body += ilist(tgt.SAssign(tgt.LSubscript(tgt.EVar(v), 0), tgt.EVar(x)))
@@ -209,6 +231,7 @@ def alloc_expr(e: src.Expr, types: dict) -> tgt.Expr:
             for e in es:
                 e_out = alloc_expr(e, types)
                 x = Id.fresh("tup")
+                
                 body += ilist(tgt.SAssign(tgt.LId(x), e_out))
                 xs += [x]
 
@@ -259,5 +282,7 @@ def is_float(e: src.Expr, types: dict) -> bool:
             return is_float(a, types) or is_float(b, types)
         case src.EOp1('-', a):
             return is_float(a, types)
+        case src.EVar(x):
+            return types.get(x) == TFloat()       
         case _:
             return False

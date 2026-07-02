@@ -62,7 +62,8 @@ class Branch:                                  # no reason to use them
 
 # Binary Instructions
 
-type Instr2Name = Literal["add", "sub", "mul", "div", "xor", "sltu", "slt", "and", "sll", "srl"]
+type Instr2Name = Literal["add", "sub", "mul", "div", "xor", "sltu", "slt", "and", "sll", "srl",
+                          "fadd.d", "fsub.d", "fmul.d", "fdiv.d"]
 
 @dataclass(frozen=True)
 class Instr2:

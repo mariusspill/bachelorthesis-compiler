@@ -40,7 +40,8 @@ class DAlign:
 
 # Register Instructions
 
-type RInstrName = Literal["add", "sub", "mul", "div", "and", "xor", "sltu", "slt", "sll", "srl"]
+type RInstrName = Literal["add", "sub", "mul", "div", "and", "xor", "sltu", "slt", "sll", "srl",
+                          "fadd.d", "fsub.d", "fmul.d", "fdiv.d"]
 
 @dataclass(frozen=True)
 class RInstr:

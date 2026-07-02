@@ -30,6 +30,10 @@ def map_node(node: ast.AST) -> Any:
             return "+"
         case ast.Sub() | ast.USub():
             return "-"
+        case ast.Mult():
+            return "*"
+        case ast.Div():
+            return "/"
         case ast.Eq():
             return "=="
         case ast.NotEq():

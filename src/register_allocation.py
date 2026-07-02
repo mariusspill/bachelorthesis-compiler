@@ -40,14 +40,14 @@ def allocate_registers_for_body(is_main: bool, blocks: src.Blocks) -> RegAllocOu
 
 REG_ORDER = ilist(
     # can not be used for register allocation
-    zero, sp, fp, tp, gp, ra, t0, t1,
+    zero, sp, fp, tp, gp, ra, t0, t1, fa0, fa1,
     # can be used for register allocation
     a0, a1, a2, a3, a4, a5, a6, a7,
     s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11,
     t2, t3, t4, t5, t6,
 )
 
-REGISTER_TO_COLOR = {r: i - 8 for i, r in enumerate(REG_ORDER)}
+REGISTER_TO_COLOR = {r: i - 10 for i, r in enumerate(REG_ORDER)}
 COLOR_TO_REGISTER = {v: k for k, v in REGISTER_TO_COLOR.items()}
 
 type Color = int  # colors are represented by natural numbers

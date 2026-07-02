@@ -78,7 +78,7 @@ def monadic_expr(e: src.Expr) -> tuple[IList[tgt.Stmt], tgt.Expr]:
             p_a1, a1_out = monadic_atom(e1)
             p_a2, a2_out = monadic_atom(e2)
             match op:
-                case "+" | "-":
+                case "+" | "-" | "*" | "/":
                    return p_a1 + p_a2,  tgt.EOp2Arith(a1_out, op, a2_out)
                 case "==" | "!=" | "<=" | "<" | ">" | ">=":
                    return p_a1 + p_a2, tgt.EOp2Comp(a1_out, op, a2_out)

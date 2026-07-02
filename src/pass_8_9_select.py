@@ -88,15 +88,38 @@ def select_stmt(end_label: Label, s: src.Stmt, types: dict) -> IList[tgt.Instr]:
                         tgt.Instr2("sub", select_lhs(lhs), tgt.Const(0, "64bit"), select_atom(e))
                     )
         case src.SAssign(lhs, src.EOp2Arith(e1, op, e2)):
-            match op:
-                case "+":
-                    return ilist(
-                        tgt.Instr2("add", select_lhs(lhs), select_atom(e1), select_atom(e2))
-                    )
-                case "-":
-                    return ilist(
-                        tgt.Instr2("sub", select_lhs(lhs), select_atom(e1), select_atom(e2))
-                    )
+            lh = select_lhs(lhs)
+            if types.get(lh) == TFloat():
+                tmp1 = Id.fresh("tmp")
+                tmp2 = Id.fresh("tmp")
+
+                result = ilist(
+                    tgt.Move(tmp1, select_atom(e1)),
+                    tgt.Move(fa0, tmp1), 
+                    tgt.Move(tmp2, select_atom(e2)),
+                    tgt.Move(fa1, tmp2)
+                )
+                match op: 
+                    case '+':
+                        result += ilist(tgt.Instr2("fadd.d", fa0, fa0, fa1))
+                    case '-':
+                        result += ilist(tgt.Instr2("fsub.d", fa0, fa0, fa1))
+                    case '*':
+                        result += ilist(tgt.Instr2("fmul.d", fa0, fa0, fa1))
+                    case '/':
+                        result += ilist(tgt.Instr2("fdiv.d", fa0, fa0, fa1))
+                result += ilist(tgt.Move(lh, fa0))
+                return result
+            else:
+                match op:
+                    case "+":
+                        return ilist(
+                            tgt.Instr2("add", select_lhs(lhs), select_atom(e1), select_atom(e2))
+                        )
+                    case "-":
+                        return ilist(
+                            tgt.Instr2("sub", select_lhs(lhs), select_atom(e1), select_atom(e2))
+                        )
         case src.SAssign(lhs, src.EOp2Comp(e1, op, e2)):
             lhs_out = select_lhs(lhs)
             match op:

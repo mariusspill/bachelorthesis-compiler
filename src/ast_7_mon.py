@@ -12,7 +12,7 @@ type Op1 = Literal["-", "not"]
 
 # Binary Operators
 
-type Op2Arith = Literal["+", "-"]
+type Op2Arith = Literal["+", "-", "*", "/"]
 type Op2Comp = Literal["==", "!=", "<=", "<", ">", ">="]
 
 # Atomic Expressions
