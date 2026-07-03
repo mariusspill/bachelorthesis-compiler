@@ -58,7 +58,7 @@ class Branch:
     target: Label
 
 type Instr2Name = Literal["add", "sub", "mul", "div", "xor", "sltu", "slt", "and", "sll", "srl",
-                          "fadd.d", "fsub.d", "fmul.d", "fdiv.d", "feq.d", "flt.d", "fle.d"]
+                          "fadd.d", "fsub.d", "fmul.d", "fdiv.d", "feq.d", "flt.d", "fle.d", "fcvt.d.l"]
 
 @dataclass(frozen=True)
 class Instr2:

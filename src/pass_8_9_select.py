@@ -87,6 +87,15 @@ def select_stmt(end_label: Label, s: src.Stmt, types: dict) -> IList[tgt.Instr]:
                     return ilist(
                         tgt.Instr2("sub", select_lhs(lhs), tgt.Const(0, "64bit"), select_atom(e))
                     )
+                case "int_to_float":
+                    lhs_out = select_lhs(lhs)
+                    tmp = Id.fresh("tmp")
+                    return ilist(
+                        tgt.Move(tmp, select_atom(e)),
+                        tgt.Instr2("srl", tmp, tmp, tgt.Const(1, '64bit')),
+                        tgt.Instr2("fcvt.d.l", fa0, fa0, tmp),
+                        tgt.Move(lhs_out, fa0),
+                    )
         case src.SAssign(lhs, src.EOp2Arith(e1, op, e2)):
             lh = select_lhs(lhs)
             e1a = select_atom(e1)

@@ -9,7 +9,7 @@ from util.immutable_list import IList
 
 # Unary Operators
 
-type Op1 = Literal["-", "not"]
+type Op1 = Literal["-", "not", "int_to_float"]
 
 # Binary Operators
 

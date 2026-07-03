@@ -4,15 +4,7 @@
 
 The governing principle of this extension was functionality first, optimisation second. This drove two central decisions. First, floats are represented as 64-bit doubles rather than 32-bit single-precision values, in order to preserve fidelity with Python's native semantics. Second, floats are stored as boxed heap objects rather than as raw values, accepting the cost of indirection in exchange for reusing the compiler's existing tuple and garbage-collection machinery. Performance optimisations were deferred until the base functionality for floats was complete, and were only revisited where time allowed.
 
-%% =====================================================================
-%% CROSS-TYPE COERCION  (design decided, implementation pending)
-%% If/when int->float coercion is implemented, revise the paragraph
-%% below: change "is currently restricted ... is realised by" tense to
-%% present/past completed, and add a forward reference to the
-%% implementation section describing where the conversion is inserted.
-%% Grep tag: TODO-COERCION
-%% =====================================================================
-A related decision concerns mixed-type arithmetic. Arithmetic is currently restricted to operands of identical type. The chosen design for lifting this restriction is implicit promotion: in any operation mixing an integer and a float, the integer operand is converted to a float before the operation is performed, so that the operation itself always acts on two floats. This keeps a single arithmetic path for floats and confines the type difference to a conversion step at the operands. The implementation of this promotion is pending. % TODO-COERCION
+A related decision concerns mixed-type arithmetic. In any operation mixing an integer and a float, the integer operand is implicitly promoted to a float before the operation is performed, matching Python's native behaviour. This keeps a single arithmetic path for floats and confines the type difference to a conversion step at the operands. The design and placement of this conversion are discussed in Section~\ref{sec:coercion}.
 
 \section{Float Representation on the Heap}
 
@@ -28,31 +20,26 @@ One option would have been to store floats as raw values directly on the heap. T
 
 The approach I chose instead was to box every float inside a two-word heap block: one header word and one word holding the value of the float. The header identifies the block as a boxed float. This yields a uniform representation that can be used for literals, for variables, and for floats nested in any heap structure, all through the same interface.
 
-%% =====================================================================
-%% GC HEADER-AWARE TRAVERSAL  (functional gap, implementation pending)
-%% If/when the collector is made header-aware so it copies a float box's
-%% payload verbatim, do BOTH of the following:
-%%   (1) replace the sentence below ("The intended behaviour ... not yet
-%%       in place.") with a present-tense description of how the header
-%%       lets the collector skip scanning the payload word; and
-%%   (2) delete the dedicated soundness-gap paragraph at the end of
-%%       "Possible Improvements" (tagged TODO-GC there), since the gap
-%%       will no longer exist.
-%% Grep tag: TODO-GC
-%% =====================================================================
-The intended behaviour is for the collector to recognise a boxed float from its header and to copy the payload word verbatim, without interpreting those raw bits as a pointer. As discussed in Section~\ref{sec:possible-improvements}, this header-aware handling is not yet in place. % TODO-GC
+The intended behaviour is for the collector to recognise a boxed float from its header and to copy the payload word verbatim, without interpreting those raw bits as a pointer. As discussed in Section~\ref{sec:possible-improvements}, this header-aware handling is not yet in place.
 
 The advantage of boxing is that it offers a uniform design that delivers full functionality with little overhead and fits almost seamlessly into the existing compiler. The disadvantage is the inefficiency that arises from having to reach inside the box on every access to the value, and from allocating a fresh box for every float that is produced, which increases pressure on the collector. These costs were judged acceptable, since the trade-off aligned with the design philosophy of providing functionality before performance.
+
+\section{Conversion of Integers to Floats in Coercion Expressions}\label{sec:coercion}
+
+Python implicitly promotes integers to floats in mixed-type operations---\texttt{3 + 3.14} evaluates to \texttt{6.14}, not a type error. Supporting this behaviour follows directly from the design philosophy of preserving Python's native semantics.
+
+The detection of cross-type operations is performed in the heap allocation pass. This pass already identifies floats to box them, and more generally decides what must happen to each piece of data---whether it needs boxing, unboxing, or conversion. Placing the coercion logic here keeps these semantic decisions in one place.
+
+When the pass detects an operation in which at least one operand is a float and the other is an integer, it wraps the integer operand in a new unary operation, \texttt{int\_to\_float}. Structurally, this operation behaves just like any other unary expression (such as negation); it flows through the subsequent passes unchanged until it reaches instruction selection, where it is lowered to the RISC-V \texttt{fcvt.d.l} instruction that converts a 64-bit integer value to a double-precision float.
+
+\subsection{Alternatives}
+
+One alternative would have been to introduce a dedicated coercion pass before the heap allocation pass. This would separate concerns more cleanly, since one could argue that the purpose of the allocation pass is heap allocation, not type coercion. While technically correct, the trade-off would be introducing an entire new pass for a single transformation in one specific case. This option was rejected as disproportionate; however, should the language require additional type conversions in the future, a unified coercion pass would become architecturally justified.
+
+A second and simpler alternative would have been to handle coercion entirely in instruction selection, using the type dictionary to detect mixed-type operands and emitting the conversion inline. This would confine the change to a single file, making it the least complex solution. The drawback is that instruction selection would take on semantic work---deciding \emph{what} conversion is needed---on top of its existing role of deciding \emph{how} to lower operations to machine instructions. The chosen approach keeps these responsibilities separate: the allocation pass decides that a conversion is needed, and instruction selection decides how to implement it. This separation also makes a future migration to a dedicated coercion pass straightforward, since the conversion is already represented as an explicit operation in the intermediate representation.
 
 \subsection{Possible Improvements}\label{sec:possible-improvements}
 
 Efficiency could be improved by replacing bit tagging with a full layout or type map, which would permit storing raw floats directly on the heap rather than boxing them. Complementarily, the register allocator could be extended to distinguish floats from integers and to maintain a separate region of the stack for floating-point values, so that raw floats could be spilled to the stack just like integers, instead of being boxed and sent to the heap.
 
-%% =====================================================================
-%% GC SOUNDNESS GAP  (functional gap, implementation pending)
-%% This entire paragraph describes a bug that exists ONLY while the
-%% collector is not header-aware. When TODO-GC is implemented, DELETE
-%% this whole paragraph.
-%% Grep tag: TODO-GC
-%% =====================================================================
-Independently of performance, the boxing scheme is not yet fully sound under the copying collector. After an object is copied, the collector scans each of its words and tests the LSB to decide whether the word is a pointer to follow. Because a boxed float's payload is a raw 64-bit double, a value whose low bit happens to be~1 would be misinterpreted as a tagged pointer and erroneously followed. Making boxing correct therefore requires the header-aware traversal described above, so that the payload word of a float box is copied verbatim and never scanned as a pointer. % TODO-GC
+Independently of performance, the boxing scheme is not yet fully sound under the copying collector. After an object is copied, the collector scans each of its words and tests the LSB to decide whether the word is a pointer to follow. Because a boxed float's payload is a raw 64-bit double, a value whose low bit happens to be~1 would be misinterpreted as a tagged pointer and erroneously followed. Making boxing correct therefore requires the header-aware traversal described above, so that the payload word of a float box is copied verbatim and never scanned as a pointer.

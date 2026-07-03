@@ -184,8 +184,10 @@ def patch_instruction(i: src.Instr) -> tgt.Block:
                         case "sltu":
                             raise Exception("Impossible instruction sltu!")
                 case Register(_):
-                    out += ilist(tgt.RInstr(op, rd, rs1, rs2))
-
+                    if op == 'fcvt.d.l':
+                        out += ilist(tgt.RFMoveInstr("fcvt.d.l", rd, rs2))
+                    else:
+                        out += ilist(tgt.RInstr(op, rd, rs1, rs2))
             if dst_address is not None:
                 out += patch_store_offset(t0, dst_address, t1)
     return out

@@ -174,20 +174,16 @@ def type_check_expr(ctx: TCtx, e: Expr) -> Type:
                         raise TypeError(f"Operator '{op}' is not supported for tuples.")
             match op:
                 case "+" | "-":
-                    check_type_equal(t1, t2, e)
                     check_types_supported(t1, [TInt(), TFloat()], e1)
                     check_types_supported(t2, [TInt(), TFloat()], e2)
-                    return t1
+                    return TFloat() if t1 == TFloat() or t2 == TFloat() else t1
                 case "*" | "/":
-                    check_type_equal(t1, t2, e)
-                    check_types_supported(t1, [TFloat()], e1)
-                    check_types_supported(t2, [TFloat()], e2)
-                    return t2
+                    check_types_supported(t1, [TInt(), TFloat()], e1)
+                    check_types_supported(t2, [TInt(), TFloat()], e2)
+                    return TFloat() if t1 == TFloat() or t2 == TFloat() else t1
                 case "==" | "!=":
-                    check_type_equal(t1, t2, e)
                     return TBool()
                 case "<=" | "<" | ">" | ">=":
-                    check_type_equal(t1, t2, e)
                     check_types_supported(t1, [TInt(), TFloat()], e1)
                     check_types_supported(t2, [TInt(), TFloat()], e2)
                     return TBool()

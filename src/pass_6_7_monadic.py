@@ -65,6 +65,10 @@ def monadic_atom(e: src.Expr, types: dict) -> tuple[IList[tgt.Stmt], tgt.ExprAto
             if types.get(v) == TFloat():
                 types[x] = TFloat()
             return p + ilist(tgt.SAssign(tgt.LId(x), e_out)), tgt.EVar(x)
+        case tgt.EOp1("int_to_float", _):
+            x = Id.fresh("x")
+            types[x] = TFloat()
+            return p + ilist(tgt.SAssign(tgt.LId(x), e_out)), tgt.EVar(x)
         case _:
             x = Id.fresh("x")
             return p + ilist(tgt.SAssign(tgt.LId(x), e_out)), tgt.EVar(x)

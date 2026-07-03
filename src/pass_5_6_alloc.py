@@ -162,8 +162,9 @@ def alloc_expr(e: src.Expr, types: dict) -> tgt.Expr:
 
                     body += ilist(tgt.SAssign(tgt.LId(t1), e1_out))
                     unboxed1 = tgt.ETupleAccess(tgt.EVar(t1), 0)
+
                 else:
-                    unboxed1 = e1_out
+                    unboxed1 = tgt.EOp1("int_to_float", e1_out)
 
                 if isf2:
                     t2 = Id.fresh("flt")
@@ -173,7 +174,7 @@ def alloc_expr(e: src.Expr, types: dict) -> tgt.Expr:
                     body += ilist(tgt.SAssign(tgt.LId(t2), e2_out))
                     unboxed2 = tgt.ETupleAccess(tgt.EVar(t2), 0)
                 else:
-                    unboxed2 = e2_out
+                    unboxed2 = tgt.EOp1("int_to_float", e2_out)
 
                 if op == '+' or op == '-' or op == '*' or op == '/':
                     # Start a garbage collection if we're out of memory.
@@ -278,7 +279,7 @@ def is_float(e: src.Expr, types: dict) -> bool:
             return True
         case src.ETupleAccess(src.EVar(v), i):
             return isinstance(types[v].ts[i], TFloat)
-        case src.EOp2(a, ('+' | '-'), b):
+        case src.EOp2(a, ('+' | '-' | '*' | '/'), b):
             return is_float(a, types) or is_float(b, types)
         case src.EOp1('-', a):
             return is_float(a, types)

@@ -41,7 +41,7 @@ class DAlign:
 # Register Instructions
 
 type RInstrName = Literal["add", "sub", "mul", "div", "and", "xor", "sltu", "slt", "sll", "srl",
-                          "fadd.d", "fsub.d", "fmul.d", "fdiv.d", "feq.d", "flt.d", "fle.d"]
+                          "fadd.d", "fsub.d", "fmul.d", "fdiv.d", "feq.d", "flt.d", "fle.d", "fcvt.d.l"]
 
 @dataclass(frozen=True)
 class RInstr:
@@ -50,7 +50,7 @@ class RInstr:
     rs1: Register  # source register 1
     rs2: Register  # source register 2
 
-type RFMoveName = Literal["fmv.d", "fmv.d.x", "fmv.x.d"]
+type RFMoveName = Literal["fmv.d", "fmv.d.x", "fmv.x.d", "fcvt.d.l"]
 
 @dataclass(frozen=True)
 class RFMoveInstr:

@@ -150,3 +150,30 @@ The following walkthrough shows the branching case. As with any float operation,
     bne     a1, t1, body_6
     j       orelse_7
 \end{lstlisting}
+
+
+\section{Type Coercion for Mixed Integer and Float Operations}
+
+The first change required was relaxing the type checker. Previously, binary operations required both operands to have the same type. This constraint was loosened so that operands need only be individually valid for the operation---for instance, both \texttt{TInt} and \texttt{TFloat} are permitted for arithmetic---without requiring them to match. When at least one operand is a float, the result type is \texttt{TFloat}.
+
+With the type checker permitting mixed-type expressions, the heap allocation pass handles the actual coercion. This pass already inspects each operand to determine whether it is a float and requires unboxing. When one operand is a float and the other is an integer, the pass wraps the integer in the \texttt{int\_to\_float} unary operation introduced in Section~\ref{sec:coercion}. The wrapped expression flows through the monadic and explicate passes without special handling.
+
+In instruction selection, the \texttt{int\_to\_float} operation is lowered to a short sequence: the integer is loaded into a temporary register, untagged by shifting right by one bit (since the compiler stores integers in tagged form), and then converted to a double-precision float using the RISC-V \texttt{fcvt.d.l} instruction. The resulting float value is moved back to an integer register, ready for use in the subsequent arithmetic operation.
+
+\subsection{Walkthrough of Generated Assembly}
+
+The following listing shows the generated code for \texttt{3.2 * 3}, where the first operand is a float and the second is an integer. The float is unboxed from the heap as usual, while the integer literal~3 is loaded in its tagged form (value~6), untagged, and converted to a double before the multiplication:
+
+\begin{lstlisting}
+    ld      a3, 7(a3)
+    li      a2, 6
+    srli    a2, a2, 1
+    fcvt.d.l fa0, a2
+    fmv.x.d a2, fa0
+    fmv.d.x fa0, a3
+    fmv.d.x fa1, a2
+    fmul.d  fa0, fa0, fa1
+    fmv.x.d a2, fa0
+\end{lstlisting}
+
+The first line unboxes the float operand. Lines two through five handle the integer: \texttt{li} loads the tagged value~6, \texttt{srli} untags it to~3, and \texttt{fcvt.d.l} converts the integer~3 to the double~3.0 in \texttt{fa0}. The result is then moved back to an integer register with \texttt{fmv.x.d}. Finally, both operands are moved into float registers and the multiplication is performed.
