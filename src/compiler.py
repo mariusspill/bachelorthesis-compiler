@@ -143,7 +143,7 @@ if verbose:
 
 if verbose:
     print("\n===== MONADIC NORMALFORM =====\n")
-ast = monadic(ast)
+ast = monadic(ast, types)
 if verbose:
     print(ast_7_mon.pretty(ast))
 

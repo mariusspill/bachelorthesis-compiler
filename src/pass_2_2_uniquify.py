@@ -62,8 +62,8 @@ def uniquify_stmt(renaming: dict[Id, Id], s: src.Stmt, types: dict) -> tgt.Stmt:
             return tgt.SAssign(y, e)
         case src.SIf(e, b1, b2):
             e = uniquify_expr(renaming, e)
-            b1 = uniquify_stmts(renaming, b1)
-            b2 = uniquify_stmts(renaming, b2)
+            b1 = uniquify_stmts(renaming, b1, types)
+            b2 = uniquify_stmts(renaming, b2, types)
             return tgt.SIf(e, b1, b2)
         case src.SWhile(e, b):
             e = uniquify_expr(renaming, e)

@@ -122,6 +122,8 @@ def select_stmt(end_label: Label, s: src.Stmt, types: dict) -> IList[tgt.Instr]:
                         )
         case src.SAssign(lhs, src.EOp2Comp(e1, op, e2)):
             lhs_out = select_lhs(lhs)
+            e1a = select_atom(e1)
+            e2a = select_atom(e2)
             match op:
                 case "==":
                     return ilist(

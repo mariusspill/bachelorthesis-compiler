@@ -91,4 +91,34 @@ When the program calls \texttt{print(a)}, the compiler emits instructions to unb
 
 \section{Arithmetic for Floating-Point Values}
 
-Implementing basic arithmetic 
+With literals and printing working, the next step was arithmetic. The base compiler only supported addition and subtraction for integers, so multiplication (\texttt{*}) and division (\texttt{/}) had to be added to the parser, type checker, and every intermediate AST regardless of floats. For floating-point values, RISC-V provides native double-precision instructions for all four operations: \texttt{fadd.d}, \texttt{fsub.d}, \texttt{fmul.d}, and \texttt{fdiv.d}.
+
+\subsection{Transient Use of Float Registers}
+
+The central design choice for arithmetic was to keep float registers as a transient detour rather than a place where values live. The instruction selection pass emits the following sequence for every float operation: move both unboxed operands from integer registers into \texttt{fa0} and \texttt{fa1} with \texttt{fmv.d.x}, perform the operation (e.g.\ \texttt{fadd.d fa0, fa0, fa1}), move the result back to an integer register with \texttt{fmv.x.d}, and box it on the heap immediately. Float registers are therefore never live across instruction boundaries from the register allocator's perspective.
+
+This approach required two supporting changes. First, the heap allocation pass already introduces temporary variables for each intermediate result of a nested expression. These temporaries must be recorded in the type dictionary as \texttt{TFloat} so that downstream passes can identify them. Second, the instruction selection pass must distinguish float operations from integer ones. I chose to check the type of the \emph{destination} variable---the left-hand side of the assignment---rather than the operand types, because the monadic normalisation pass may have replaced the original operands with untyped temporaries. The destination, however, is always a variable created by the allocation pass and therefore always present in the type dictionary.
+
+\subsection{Registering Float Registers in the Allocator}
+
+Because \texttt{fa0} and \texttt{fa1} now appear explicitly in the instruction stream, the register allocator must know about them: any register that shows up in the interference graph needs a colour mapping, otherwise the graph colouring algorithm crashes when it encounters an unknown register as a neighbour of a variable. I added both registers to the blacklist at the beginning of \texttt{REG\_ORDER}, which assigns them a negative colour. This ensures the allocator recognises them but never assigns a variable to them---which is exactly the desired behaviour, since float values are boxed to the heap immediately and never need to be spilled to a float register.
+
+\subsection{Walkthrough of the Generated Assembly}
+
+The generated code for a float addition such as \texttt{a + b} mirrors the unbox--operate--box pattern. Both operands are loaded from the heap, moved into float registers, added, and the result is stored back:
+
+\begin{lstlisting}
+    ld      a3, 7(a3)
+    fmv.d.x fa0, a2
+    add     a2, zero, a3
+    fmv.d.x fa1, a2
+    fadd.d  fa0, fa0, fa1
+    fmv.x.d a2, fa0
+    add     t0, zero, a2
+    sd      t0, 7(a1)
+\end{lstlisting}
+
+The first two lines unbox the first operand: \texttt{ld} loads the raw bits from the heap (at tagged offset~7), and \texttt{fmv.d.x} reinterprets them as a double in \texttt{fa0}. Lines three and four do the same for the second operand into \texttt{fa1}. The \texttt{fadd.d} performs the addition. Finally, \texttt{fmv.x.d} moves the result back to an integer register, and \texttt{sd} stores it into a freshly allocated box on the heap.
+
+
+\section{Comparing Operations for Floats}
