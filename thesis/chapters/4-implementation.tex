@@ -97,7 +97,7 @@ With literals and printing working, the next step was arithmetic. The base compi
 
 The central design choice for arithmetic was to keep float registers as a transient detour rather than a place where values live. The instruction selection pass emits the following sequence for every float operation: move both unboxed operands from integer registers into \texttt{fa0} and \texttt{fa1} with \texttt{fmv.d.x}, perform the operation (e.g.\ \texttt{fadd.d fa0, fa0, fa1}), move the result back to an integer register with \texttt{fmv.x.d}, and box it on the heap immediately. Float registers are therefore never live across instruction boundaries from the register allocator's perspective.
 
-This approach required two supporting changes. First, the heap allocation pass already introduces temporary variables for each intermediate result of a nested expression. These temporaries must be recorded in the type dictionary as \texttt{TFloat} so that downstream passes can identify them. Second, the instruction selection pass must distinguish float operations from integer ones. I chose to check the type of the \emph{destination} variable---the left-hand side of the assignment---rather than the operand types, because the monadic normalisation pass may have replaced the original operands with untyped temporaries. The destination, however, is always a variable created by the allocation pass and therefore always present in the type dictionary.
+This approach required two supporting changes. First, the heap allocation pass already introduces temporary variables for each intermediate result of a nested expression. These temporaries must be recorded in the type dictionary as \texttt{TFloat} so that downstream passes can identify them. Second, the instruction selection pass must distinguish float operations from integer ones by checking the operand types. However, the monadic normalisation pass---which flattens nested expressions into a sequence of assignments to fresh temporaries---originally did not have access to the type dictionary, leaving its temporaries untyped. To solve this, I threaded the type dictionary through the monadic pass. When the pass creates a new temporary for a non-atomic expression such as \texttt{ETupleAccess(EVar(v), 0)} where \texttt{v} is typed as \texttt{TFloat}, the temporary inherits that type. This ensures that operand types are available in instruction selection uniformly for both arithmetic and comparisons.
 
 \subsection{Registering Float Registers in the Allocator}
 
@@ -122,3 +122,31 @@ The first two lines unbox the first operand: \texttt{ld} loads the raw bits from
 
 
 \section{Comparing Operations for Floats}
+
+With arithmetic in place, the next step was comparisons. The RISC-V AST had to be extended with three native double-precision comparison instructions: \texttt{feq.d}, \texttt{flt.d}, and \texttt{fle.d}. As with integers, comparisons appear in two contexts that must be handled differently: assigning the result of a comparison to a variable, and branching on a comparison (e.g.\ \texttt{if}/\texttt{else}).
+
+\subsection{Assigning Comparison Results}
+
+When a comparison result is assigned to a variable, the compiler loads both operands, checks their types, and---if they are floats---moves them into the designated float registers to perform the comparison. The result is a~0 or~1 in an integer register, which is then tagged like any other integer and stored in the destination variable.
+
+RISC-V only provides \texttt{feq.d} (equal), \texttt{flt.d} (less than), and \texttt{fle.d} (less or equal). The missing operators are derived with simple transformations: greater-than and greater-or-equal swap the operands (\texttt{a > b} becomes \texttt{flt.d rd, fb, fa}), while not-equal uses \texttt{feq.d} followed by an \texttt{xor} to invert the result.
+
+\subsection{Branching on Comparison Results}
+
+The branching case differs structurally from the integer path. For integers, RISC-V can compare and branch in a single instruction (e.g.\ \texttt{blt rs1, rs2, label}). For floats, this is not possible---no float branch instructions exist. Instead, the compiler emits the float comparison into a temporary integer register and then branches on that register with \texttt{bne} (branch if not equal to zero).
+
+\subsection{Walkthrough of Generated Assembly}
+
+The following walkthrough shows the branching case. As with any float operation, both values are unboxed from the heap and moved into float registers. The \texttt{flt.d} instruction compares them and writes~1 or~0 to an integer register. The result is then tagged and the branch is taken accordingly:
+
+\begin{lstlisting}
+    ld      a2, 7(a2)
+    ld      a1, 7(a1)
+    fmv.d.x fa0, a2
+    fmv.d.x fa1, a1
+    flt.d   a1, fa1, fa0
+    slli    a1, a1, 1
+    li      t1, 0
+    bne     a1, t1, body_6
+    j       orelse_7
+\end{lstlisting}

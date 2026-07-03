@@ -89,14 +89,16 @@ def select_stmt(end_label: Label, s: src.Stmt, types: dict) -> IList[tgt.Instr]:
                     )
         case src.SAssign(lhs, src.EOp2Arith(e1, op, e2)):
             lh = select_lhs(lhs)
-            if types.get(lh) == TFloat():
+            e1a = select_atom(e1)
+            e2a = select_atom(e2)
+            if types.get(e1a) == TFloat() and types.get(e2a) == TFloat():
                 tmp1 = Id.fresh("tmp")
                 tmp2 = Id.fresh("tmp")
 
                 result = ilist(
-                    tgt.Move(tmp1, select_atom(e1)),
+                    tgt.Move(tmp1, e1a),
                     tgt.Move(fa0, tmp1), 
-                    tgt.Move(tmp2, select_atom(e2)),
+                    tgt.Move(tmp2, e2a),
                     tgt.Move(fa1, tmp2)
                 )
                 match op: 
@@ -124,47 +126,72 @@ def select_stmt(end_label: Label, s: src.Stmt, types: dict) -> IList[tgt.Instr]:
             lhs_out = select_lhs(lhs)
             e1a = select_atom(e1)
             e2a = select_atom(e2)
-            match op:
-                case "==":
-                    return ilist(
-                        tgt.Instr2("sub", lhs_out, select_atom(e1), select_atom(e2)),
-                        tgt.Instr2("sltu", lhs_out, lhs_out, tgt.Const(1, '64bit')),
-                        # Left shift because of tagging
-                        tgt.Instr2("sll", lhs_out, lhs_out, tgt.Const(1, '64bit')),
-                    )
-                case "!=":
-                    return ilist(
-                        tgt.Instr2("sub", lhs_out, select_atom(e1), select_atom(e2)),
-                        tgt.Instr2("sltu", lhs_out, zero, lhs_out),
-                        # Left shift because of tagging
-                        tgt.Instr2("sll", lhs_out, lhs_out, tgt.Const(1, '64bit')),
-                    )
-                case "<":
-                    return ilist(
-                        tgt.Instr2("slt", lhs_out, select_atom(e1), select_atom(e2)),
-                        # Left shift because of tagging
-                        tgt.Instr2("sll", lhs_out, lhs_out, tgt.Const(1, '64bit')),
-                    )
-                case ">":
-                    return ilist(
-                        tgt.Instr2("slt", lhs_out, select_atom(e2), select_atom(e1)),
-                        # Left shift because of tagging
-                        tgt.Instr2("sll", lhs_out, lhs_out, tgt.Const(1, '64bit')),
-                    )
-                case "<=":
-                    return ilist(
-                        tgt.Instr2("slt", lhs_out, select_atom(e2), select_atom(e1)),
-                        tgt.Instr2("xor", lhs_out, lhs_out, tgt.Const(1, '64bit')),
-                        # Left shift because of tagging
-                        tgt.Instr2("sll", lhs_out, lhs_out, tgt.Const(1, '64bit')),
-                    )
-                case ">=":
-                    return ilist(
-                        tgt.Instr2("slt", lhs_out, select_atom(e1), select_atom(e2)),
-                        tgt.Instr2("xor", lhs_out, lhs_out, tgt.Const(1, '64bit')),
-                        # Left shift because of tagging
-                        tgt.Instr2("sll", lhs_out, lhs_out, tgt.Const(1, '64bit')),
-                    )
+            if types.get(e1a) == TFloat() and types.get(e2a) == TFloat():
+                tmp1 = Id.fresh("tmp")
+                tmp2 = Id.fresh("tmp")
+                result = ilist(
+                    tgt.Move(tmp1, select_atom(e1)),
+                    tgt.Move(fa0, tmp1), 
+                    tgt.Move(tmp2, select_atom(e2)),
+                    tgt.Move(fa1, tmp2)
+                )
+                match op:
+                    case "==":
+                        result += ilist(tgt.Instr2("feq.d", lhs_out, fa0, fa1))
+                    case "!=":
+                        result += ilist(tgt.Instr2("feq.d", lhs_out, fa0, fa1),
+                                        tgt.Instr2("xor", lhs_out, lhs_out, tgt.Const(1, '64bit')))
+                    case "<":
+                        result += ilist(tgt.Instr2("flt.d", lhs_out, fa0, fa1))
+                    case ">":
+                        result += ilist(tgt.Instr2("flt.d", lhs_out, fa1, fa0))
+                    case "<=":
+                        result += ilist(tgt.Instr2("fle.d", lhs_out, fa0, fa1))
+                    case ">=":
+                        result += ilist(tgt.Instr2("fle.d", lhs_out, fa1, fa0))
+                return result + ilist(tgt.Instr2("sll", lhs_out, lhs_out, tgt.Const(1, '64bit')))
+            else:
+                match op:
+                    case "==":
+                        return ilist(
+                            tgt.Instr2("sub", lhs_out, select_atom(e1), select_atom(e2)),
+                            tgt.Instr2("sltu", lhs_out, lhs_out, tgt.Const(1, '64bit')),
+                            # Left shift because of tagging
+                            tgt.Instr2("sll", lhs_out, lhs_out, tgt.Const(1, '64bit')),
+                        )
+                    case "!=":
+                        return ilist(
+                            tgt.Instr2("sub", lhs_out, select_atom(e1), select_atom(e2)),
+                            tgt.Instr2("sltu", lhs_out, zero, lhs_out),
+                            # Left shift because of tagging
+                            tgt.Instr2("sll", lhs_out, lhs_out, tgt.Const(1, '64bit')),
+                        )
+                    case "<":
+                        return ilist(
+                            tgt.Instr2("slt", lhs_out, select_atom(e1), select_atom(e2)),
+                            # Left shift because of tagging
+                            tgt.Instr2("sll", lhs_out, lhs_out, tgt.Const(1, '64bit')),
+                        )
+                    case ">":
+                        return ilist(
+                            tgt.Instr2("slt", lhs_out, select_atom(e2), select_atom(e1)),
+                            # Left shift because of tagging
+                            tgt.Instr2("sll", lhs_out, lhs_out, tgt.Const(1, '64bit')),
+                        )
+                    case "<=":
+                        return ilist(
+                            tgt.Instr2("slt", lhs_out, select_atom(e2), select_atom(e1)),
+                            tgt.Instr2("xor", lhs_out, lhs_out, tgt.Const(1, '64bit')),
+                            # Left shift because of tagging
+                            tgt.Instr2("sll", lhs_out, lhs_out, tgt.Const(1, '64bit')),
+                        )
+                    case ">=":
+                        return ilist(
+                            tgt.Instr2("slt", lhs_out, select_atom(e1), select_atom(e2)),
+                            tgt.Instr2("xor", lhs_out, lhs_out, tgt.Const(1, '64bit')),
+                            # Left shift because of tagging
+                            tgt.Instr2("sll", lhs_out, lhs_out, tgt.Const(1, '64bit')),
+                        )
         case src.SAssign(lhs, src.EAllocate(num_elems)):
             lhs_out = select_lhs(lhs)
             tmp = Id.fresh("tmp")
@@ -255,25 +282,55 @@ def select_stmt(end_label: Label, s: src.Stmt, types: dict) -> IList[tgt.Instr]:
                 tgt.Call(Label("gc_collect"), 2, 'normal'),
             )
         case src.SIf(src.EOp2Comp(e1, op, e2), body_label, orelse_label):
-            match op:
-                case "==":
-                    cc: Literal["beq", "bne", "blt", "bge"] = "beq"
-                case "!=":
-                    cc = "bne"
-                case "<":
-                    cc = "blt"
-                case "<=":
-                    cc = "bge"
-                    e2, e1 = e1, e2
-                case ">":
-                    cc = "blt"
-                    e2, e1 = e1, e2
-                case ">=":
-                    cc = "bge"
-            return ilist(
-                tgt.Branch(cc, select_atom(e1), select_atom(e2), body_label),
-                tgt.Jump(orelse_label),
-            )
+            e1a = select_atom(e1)
+            e2a = select_atom(e2)
+            if types.get(e1a) == TFloat() and types.get(e2a) == TFloat():
+                tmp1 = Id.fresh("tmp")
+                tmp2 = Id.fresh("tmp")
+                result = ilist(
+                    tgt.Move(tmp1, e1a),
+                    tgt.Move(fa0, tmp1), 
+                    tgt.Move(tmp2, e2a),
+                    tgt.Move(fa1, tmp2)
+                )
+                match op:
+                    case "==":
+                        result += ilist(tgt.Instr2("feq.d", t0, fa0, fa1))
+                    case "!=":
+                        result += ilist(tgt.Instr2("feq.d", t0, fa0, fa1),
+                                        tgt.Instr2("xor", t0, t0, tgt.Const(1, '64bit')))
+                    case "<":
+                        result += ilist(tgt.Instr2("flt.d", t0, fa0, fa1))
+                    case "<=":
+                        result += ilist(tgt.Instr2("fle.d", t0, fa0, fa1))
+                    case ">":
+                        result += ilist(tgt.Instr2("flt.d", t0, fa1, fa0))
+                    case ">=":
+                        result += ilist(tgt.Instr2("fle.d", t0, fa1, fa0))
+                return result + ilist(
+                    tgt.Branch("bne", t0, zero, body_label),
+                    tgt.Jump(orelse_label),
+                )
+            else:
+                match op:
+                    case "==":
+                        cc: Literal["beq", "bne", "blt", "bge"] = "beq"
+                    case "!=":
+                        cc = "bne"
+                    case "<":
+                        cc = "blt"
+                    case "<=":
+                        cc = "bge"
+                        e2, e1 = e1, e2
+                    case ">":
+                        cc = "blt"
+                        e2, e1 = e1, e2
+                    case ">=":
+                        cc = "bge"
+                return ilist(
+                    tgt.Branch(cc, select_atom(e1), select_atom(e2), body_label),
+                    tgt.Jump(orelse_label),
+                )
         case src.SGoto(target):
             return ilist(tgt.Jump(target))
     raise Exception("Impossible!")

@@ -76,6 +76,8 @@ def apply(f: Value, xs: tuple[Value, ...]) -> Optional[Value]:
 
 def eval_expr(env: RTEnv, e: Expr) -> Value:
     match e:
+        case EConstFloat(c):
+            return c
         case EConst(c):
             return c
         case EVar(x):
@@ -111,6 +113,10 @@ def eval_expr(env: RTEnv, e: Expr) -> Value:
                             return simulate_over_and_underflow(x1 + x2)
                         case "-":
                             return simulate_over_and_underflow(x1 - x2)
+                        case "*":
+                            return simulate_over_and_underflow(x1 * x2)
+                        case "/":
+                            return simulate_over_and_underflow(x1 / x2)
                         case "==":
                             return x1 == x2
                         case "!=":
