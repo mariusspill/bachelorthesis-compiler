@@ -52,7 +52,7 @@ def compute_prelude(reg_alloc: RegAllocOutput, is_main: bool) -> tgt.Program:
     )
 
     _offset = 8 * (2 + len(reg_alloc.callee_saved))
-    for i in range(_offset, offset, 8):
+    for i in range(_offset, offset, 1024):
         prelude += ilist(tgt.Store(zero, tgt.Offset(sp, offset - i-8)))
 
     prelude += ilist(    
@@ -78,7 +78,7 @@ def compute_prelude(reg_alloc: RegAllocOutput, is_main: bool) -> tgt.Program:
             # the stack pointer when main was called.
             tgt.IInstr2("addi", a0, fp, -8 * (2 + len(reg_alloc.callee_saved))),
             # Argument 2 is the initial size for from- and to-space in words
-            tgt.IInstr1("li", a1, 1024),
+            tgt.IInstr1("li", a1, 4),
             # Call gc init
             tgt.Call(Label("gc_init")),
         )

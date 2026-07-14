@@ -31,6 +31,17 @@ def monadic_stmt(s: src.Stmt, types: dict) -> IList[tgt.Stmt]:
         case src.SAssign(l, e):
             p_l, l_out = monadic_lhs(l, types)
             p_e, e_out = monadic_expr(e, types)
+            match l_out, e_out:
+                case tgt.LId(x), tgt.EFunRef(name):
+                    key = next((k for k in types if k.name == name.label), None)
+                    if key and isinstance(types[key], TCallable):
+                        types[x] = types[key]
+                case tgt.LId(x), tgt.EVar(y):
+                    if isinstance(types.get(y), TCallable):
+                        types[x] = types[y]
+                case tgt.LSubscript(tgt.EVar(v) , _), tgt.EVar(y):
+                    if isinstance(types.get(y), TCallable):
+                        types[v] = types[y]
             return p_l + p_e + ilist(tgt.SAssign(l_out, e_out))
         case src.SIf(e, b1, b2):
             p_e, e_out = monadic_condition(e, types)
@@ -64,10 +75,18 @@ def monadic_atom(e: src.Expr, types: dict) -> tuple[IList[tgt.Stmt], tgt.ExprAto
             x = Id.fresh("x")
             if types.get(v) == TFloat():
                 types[x] = TFloat()
+            elif isinstance(types.get(v), TCallable):
+                types[x] = types[v]
             return p + ilist(tgt.SAssign(tgt.LId(x), e_out)), tgt.EVar(x)
         case tgt.EOp1("int_to_float", _):
             x = Id.fresh("x")
             types[x] = TFloat()
+            return p + ilist(tgt.SAssign(tgt.LId(x), e_out)), tgt.EVar(x)
+        case tgt.ECall(tgt.EVar(f), _):
+            x = Id.fresh("x")
+            t = types.get(f)
+            if isinstance(t, TCallable) and t.ret_ty == TFloat():
+                types[x] = TFloat()
             return p + ilist(tgt.SAssign(tgt.LId(x), e_out)), tgt.EVar(x)
         case _:
             x = Id.fresh("x")

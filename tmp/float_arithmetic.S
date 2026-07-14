@@ -4,8 +4,6 @@
 main: 
 	addi	sp,sp,-128
 	sd	zero,16(sp)
-	sd	zero,8(sp)
-	sd	zero,0(sp)
 	sd	ra,120(sp)
 	sd	fp,112(sp)
 	addi	fp,sp,128
@@ -32,7 +30,7 @@ main:
 	add	s10,zero,zero
 	add	s7,zero,zero
 	addi	a0,fp,-104
-	li	a1,1024
+	li	a1,4
 	call	gc_init
 	j	main_start
 main_start: 
@@ -54,7 +52,7 @@ cont_2:
 	addi	t0,t0,16
 	la	t1,gc_free_ptr
 	sd	t0,0(t1)
-	li	t0,2
+	li	t0,6
 	sd	t0,-1(a1)
 	li	a2,4614253070214989087
 	add	t0,zero,a2
@@ -79,7 +77,7 @@ cont_5:
 	addi	t0,t0,16
 	la	t1,gc_free_ptr
 	sd	t0,0(t1)
-	li	t0,2
+	li	t0,6
 	sd	t0,-1(a1)
 	li	a2,4616414798036126925
 	add	t0,zero,a2
@@ -104,7 +102,7 @@ cont_8:
 	addi	t0,t0,16
 	la	t1,gc_free_ptr
 	sd	t0,0(t1)
-	li	t0,2
+	li	t0,6
 	sd	t0,-1(a1)
 	ld	a2,-112(fp)
 	ld	a2,7(a2)
@@ -113,7 +111,7 @@ cont_8:
 	fmv.d.x	fa0,a2
 	add	a2,zero,a3
 	fmv.d.x	fa1,a2
-	fmul.d	fa0,fa0,fa1
+	fadd.d	fa0,fa0,fa1
 	fmv.x.d	a2,fa0
 	add	t0,zero,a2
 	sd	t0,7(a1)
@@ -137,9 +135,9 @@ cont_11:
 	addi	t0,t0,16
 	la	t1,gc_free_ptr
 	sd	t0,0(t1)
-	li	t0,2
+	li	t0,6
 	sd	t0,-1(a1)
-	li	a2,4608983858650965606
+	li	a2,4607632778762754458
 	add	t0,zero,a2
 	sd	t0,7(a1)
 	add	t0,zero,a1
@@ -162,7 +160,7 @@ cont_14:
 	addi	t0,t0,16
 	la	t1,gc_free_ptr
 	sd	t0,0(t1)
-	li	t0,2
+	li	t0,6
 	sd	t0,-1(a1)
 	ld	a2,-112(fp)
 	ld	a2,7(a2)
@@ -171,7 +169,7 @@ cont_14:
 	fmv.d.x	fa0,a2
 	add	a2,zero,a3
 	fmv.d.x	fa1,a2
-	fdiv.d	fa0,fa0,fa1
+	fadd.d	fa0,fa0,fa1
 	fmv.x.d	a2,fa0
 	add	t0,zero,a2
 	sd	t0,7(a1)

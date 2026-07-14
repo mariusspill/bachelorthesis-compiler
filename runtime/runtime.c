@@ -157,7 +157,7 @@ void gc_copy_if_heap_ptr(int64_t* p) {
       // In this case, the meta data contains the number of words after
       // the meta data.  We rightshift to remove the 0 tag bit, and add
       // 1 to account for the meta data itself.
-      uint64_t word_len = 1 + (((uint64_t) *object_ptr) >> 1);
+      uint64_t word_len = 1 + (((uint64_t) *object_ptr) >> 2);
 
       printf_if_debug("  heap ptr: copying object of %" PRIu64 " words...\n", word_len);
       /* printf_if_debug("    %d\n", (object_ptr < gc_fromspace_end && object_ptr >= gc_fromspace_begin)); */
@@ -205,8 +205,18 @@ void gc_copy_and_swap_spaces(
   // Note that gc_free_ptr in the for-loop condition might
   // increase while the for-loop is running due to the calls to
   // gc_copy_object. This is by design!
-  for (int64_t* p = gc_tospace_begin; p < gc_free_ptr; ++p) {
-    gc_copy_if_heap_ptr(p);
+  int64_t* p = gc_tospace_begin;
+  while(p< gc_free_ptr){
+    uint64_t count = ((uint64_t) *p) >> 2;  
+    if (*p & 0b10) {
+      p += 2;
+    } else {
+      p++;
+      for (uint64_t i = 0; i < count; i++) {
+        gc_copy_if_heap_ptr(p);
+        p++;
+      }
+    }
   }
 
   // Swap from-space and to-space

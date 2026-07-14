@@ -39,7 +39,7 @@ def select_stmt(end_label: Label, s: src.Stmt, types: dict) -> IList[tgt.Instr]:
     match s:
         case src.SPrint(e):
             atom = select_atom(e)
-            if types[atom] == TFloat():
+            if types.get(atom) == TFloat():
                 tmp = Id.fresh("tmp")
                 return ilist(                
                 tgt.Move(tmp, tgt.Offset(select_atom(e), 7)),
@@ -205,6 +205,10 @@ def select_stmt(end_label: Label, s: src.Stmt, types: dict) -> IList[tgt.Instr]:
             lhs_out = select_lhs(lhs)
             tmp = Id.fresh("tmp")
             free_ptr = tgt.Offset(Label("gc_free_ptr"), 0)
+            if types.get(lhs.id) == TFloat():
+                header = tgt.Const((num_elems << 2) | 0b10, "64bit")
+            else:
+                header = tgt.Const(num_elems << 2, '64bit')
             return ilist(
                 # Move the free_ptr into a new temporary.
                 tgt.Instr2('add', tmp, free_ptr, tgt.Const(1, '64bit')),
@@ -214,7 +218,7 @@ def select_stmt(end_label: Label, s: src.Stmt, types: dict) -> IList[tgt.Instr]:
                 # Now the old free_ptr in tmp is the begin of our allocated memory region.
                 # Initialize the meta data in the first byte of the allocated memory
                 # with a 0 tag (not yet copied) and the length auf the tuple in the other 63bit.
-                tgt.Move(tgt.Offset(tmp, -1), tgt.Const(num_elems, '63bit')),
+                tgt.Move(tgt.Offset(tmp, -1), header),
                 # Use the tagged old free_ptr as the result.
                 tgt.Move(lhs_out, tmp),
             )
@@ -228,7 +232,8 @@ def select_stmt(end_label: Label, s: src.Stmt, types: dict) -> IList[tgt.Instr]:
                         # Get the meta data. We subtract 1 because of the heap pointer tag.
                         # The tag is 0, so the meta data directly contains the length in 63bit form
                         # Move the result into the lhs
-                        tgt.Move(lhs_out, tgt.Offset(x, -1))
+                        tgt.Move(lhs_out, tgt.Offset(x, -1)),
+                        tgt.Instr2("srl", lhs_out, lhs_out, tgt.Const(1, '64bit'))
                     )
         case src.SAssign(lhs, src.ETupleAccess(e, i)):
             lhs_out = select_lhs(lhs)

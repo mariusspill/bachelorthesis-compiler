@@ -4,8 +4,6 @@
 main: 
 	addi	sp,sp,-128
 	sd	zero,16(sp)
-	sd	zero,8(sp)
-	sd	zero,0(sp)
 	sd	ra,120(sp)
 	sd	fp,112(sp)
 	addi	fp,sp,128
@@ -32,7 +30,7 @@ main:
 	add	s10,zero,zero
 	add	s7,zero,zero
 	addi	a0,fp,-104
-	li	a1,1024
+	li	a1,4
 	call	gc_init
 	j	main_start
 main_start: 
@@ -54,7 +52,7 @@ cont_2:
 	addi	t0,t0,16
 	la	t1,gc_free_ptr
 	sd	t0,0(t1)
-	li	t0,2
+	li	t0,6
 	sd	t0,-1(a1)
 	li	a2,4614253070214989087
 	add	t0,zero,a2
@@ -79,7 +77,7 @@ cont_5:
 	addi	t0,t0,16
 	la	t1,gc_free_ptr
 	sd	t0,0(t1)
-	li	t0,2
+	li	t0,6
 	sd	t0,-1(a1)
 	li	a2,4612136378390124954
 	add	t0,zero,a2
@@ -115,7 +113,7 @@ cont_11:
 	addi	t0,t0,16
 	la	t1,gc_free_ptr
 	sd	t0,0(t1)
-	li	t0,2
+	li	t0,6
 	sd	t0,-1(a1)
 	li	a2,4616302208045442662
 	add	t0,zero,a2
@@ -140,7 +138,7 @@ cont_14:
 	addi	t0,t0,16
 	la	t1,gc_free_ptr
 	sd	t0,0(t1)
-	li	t0,2
+	li	t0,6
 	sd	t0,-1(a1)
 	ld	a3,-120(fp)
 	ld	a3,7(a3)
@@ -206,7 +204,7 @@ cont_17:
 	addi	t0,t0,16
 	la	t1,gc_free_ptr
 	sd	t0,0(t1)
-	li	t0,2
+	li	t0,6
 	sd	t0,-1(a1)
 	add	a2,zero,a1
 	li	a1,4618103647896390861
@@ -232,7 +230,7 @@ cont_20:
 	addi	t0,t0,16
 	la	t1,gc_free_ptr
 	sd	t0,0(t1)
-	li	t0,2
+	li	t0,6
 	sd	t0,-1(a1)
 	ld	a3,-120(fp)
 	ld	a3,7(a3)

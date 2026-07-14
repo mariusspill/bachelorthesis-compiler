@@ -30,7 +30,7 @@ main:
 	add	s10,zero,zero
 	add	s7,zero,zero
 	addi	a0,fp,-104
-	li	a1,1024
+	li	a1,4
 	call	gc_init
 	j	main_start
 main_start: 
@@ -52,19 +52,19 @@ cont_2:
 	addi	t0,t0,16
 	la	t1,gc_free_ptr
 	sd	t0,0(t1)
-	li	t0,2
+	li	t0,6
 	sd	t0,-1(a1)
-	li	a2,4614388178203810202
+	li	a2,4614253070214989087
 	add	t0,zero,a2
 	sd	t0,7(a1)
 	add	t0,zero,a1
 	sd	t0,-112(fp)
 	la	a1,gc_free_ptr
 	ld	a1,0(a1)
-	addi	a1,a1,16
-	la	a2,gc_fromspace_end
-	ld	a2,0(a2)
-	blt	a1,a2,body_3
+	addi	a2,a1,16
+	la	a1,gc_fromspace_end
+	ld	a1,0(a1)
+	blt	a2,a1,body_3
 	j	orelse_4
 body_3: 
 	j	cont_5
@@ -77,38 +77,64 @@ cont_5:
 	addi	t0,t0,16
 	la	t1,gc_free_ptr
 	sd	t0,0(t1)
-	li	t0,2
+	li	t0,6
 	sd	t0,-1(a1)
-	ld	a3,-112(fp)
-	ld	a3,7(a3)
-	li	a2,6
-	srli	a2,a2,1
-	fcvt.d.l	fa0,a2
-	fmv.x.d	a2,fa0
-	fmv.d.x	fa0,a3
-	fmv.d.x	fa1,a2
-	fmul.d	fa0,fa0,fa1
-	fmv.x.d	a2,fa0
+	li	a2,4607182418800017408
 	add	t0,zero,a2
 	sd	t0,7(a1)
-	li	a3,4
-	srli	a3,a3,1
-	fcvt.d.l	fa0,a3
-	fmv.x.d	a3,fa0
+	ld	a2,-112(fp)
+	ld	a2,7(a2)
+	ld	a1,7(a1)
 	fmv.d.x	fa0,a2
-	add	a2,zero,a3
-	fmv.d.x	fa1,a2
-	flt.d	a2,fa1,fa0
-	slli	a2,a2,1
+	fmv.d.x	fa1,a1
+	flt.d	a1,fa1,fa0
+	slli	a1,a1,1
 	li	t1,0
-	bne	a2,t1,body_6
+	bne	a1,t1,body_6
 	j	orelse_7
 body_6: 
+	la	a1,gc_free_ptr
+	ld	a1,0(a1)
+	addi	a2,a1,16
+	la	a1,gc_fromspace_end
+	ld	a1,0(a1)
+	blt	a2,a1,body_9
+	j	orelse_10
+body_9: 
+	j	cont_11
+cont_11: 
+	la	t0,gc_free_ptr
+	ld	t0,0(t0)
+	addi	a1,t0,1
+	la	t0,gc_free_ptr
+	ld	t0,0(t0)
+	addi	t0,t0,16
+	la	t1,gc_free_ptr
+	sd	t0,0(t1)
+	li	t0,6
+	sd	t0,-1(a1)
+	li	a2,4617315517961601024
+	add	t0,zero,a2
+	sd	t0,7(a1)
+	ld	a2,-112(fp)
+	ld	a2,7(a2)
+	ld	a1,7(a1)
+	fmv.d.x	fa0,a2
+	fmv.d.x	fa1,a1
+	flt.d	a1,fa0,fa1
+	slli	a1,a1,1
+	j	cont_8
+cont_8: 
+	li	t1,0
+	bne	a1,t1,body_12
+	j	orelse_13
+body_12: 
+	ld	a1,-112(fp)
 	ld	a1,7(a1)
 	fmv.d.x	fa0,a1
 	call	print_float
-	j	cont_8
-cont_8: 
+	j	cont_14
+cont_14: 
 	j	main_conclusion
 main_conclusion: 
 	ld	s3,-24(fp)
@@ -127,39 +153,16 @@ main_conclusion:
 	addi	sp,sp,112
 	addi	a0,zero,0
 	ret
-orelse_7: 
-	la	a1,gc_free_ptr
-	ld	a1,0(a1)
-	addi	a1,a1,16
-	la	a2,gc_fromspace_end
-	ld	a2,0(a2)
-	blt	a1,a2,body_9
-	j	orelse_10
-body_9: 
-	j	cont_11
-cont_11: 
-	la	t0,gc_free_ptr
-	ld	t0,0(t0)
-	addi	a1,t0,1
-	la	t0,gc_free_ptr
-	ld	t0,0(t0)
-	addi	t0,t0,16
-	la	t1,gc_free_ptr
-	sd	t0,0(t1)
-	li	t0,2
-	sd	t0,-1(a1)
-	add	a2,zero,a1
-	li	a1,4623057607486498406
-	add	t0,zero,a1
-	sd	t0,7(a2)
-	fmv.d.x	fa0,a1
-	call	print_float
-	j	cont_8
+orelse_13: 
+	j	cont_14
 orelse_10: 
 	add	a0,zero,sp
 	li	a1,2
 	call	gc_collect
 	j	cont_11
+orelse_7: 
+	li	a1,0
+	j	cont_8
 orelse_4: 
 	add	a0,zero,sp
 	li	a1,2
