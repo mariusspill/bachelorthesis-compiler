@@ -258,8 +258,17 @@ def alloc_expr(e: src.Expr, types: dict) -> tgt.Expr:
                 body += ilist(tgt.SAssign(tgt.LSubscript(tgt.EVar(v), i), tgt.EVar(x)))
 
             return tgt.EBegin(body, tgt.EVar(v))
-        case src.ETupleAccess(e, i):
-            return tgt.ETupleAccess(alloc_expr(e, types), i)
+        case src.ETupleAccess(e, i) as whole:
+            e_out = alloc_expr(e, types)
+            if is_float(whole, types):
+                t = Id.fresh("flt")
+                types[t] = TFloat()
+                return tgt.EBegin(
+                    ilist(tgt.SAssign(tgt.LId(t), tgt.ETupleAccess(e_out, i))),
+                    tgt.EVar(t),
+                )
+            else:
+                return tgt.ETupleAccess(e_out, i)
         case src.ETupleLen(e):
             return tgt.ETupleLen(alloc_expr(e, types))
         case src.ECall(e_func, e_args):
@@ -278,7 +287,15 @@ def is_float(e: src.Expr, types: dict) -> bool:
         case src.EConstFloat(c):
             return True
         case src.ETupleAccess(src.EVar(v), i):
-            return isinstance(types[v].ts[i], TFloat)
+            vt = types.get(v)
+            match vt:
+                case TTuple(ts):
+                    return isinstance(ts[i], TFloat)
+                case TClass(name, _):
+                    fields = types[Id(f"{name}@type")]._fields
+                    return isinstance(fields[i][1], TFloat)
+                case _:
+                    return False
         case src.EOp2(a, ('+' | '-' | '*' | '/'), b):
             return is_float(a, types) or is_float(b, types)
         case src.EOp1('-', a):

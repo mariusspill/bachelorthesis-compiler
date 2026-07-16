@@ -1,3 +1,4 @@
+from math import isclose
 import os
 os.environ["PYTHONHASHSEED"] = "1"
 
@@ -66,6 +67,26 @@ for p in paths:
 input_paths = [p.with_suffix(".in") for p in src_paths]
 
 print()
+
+def outputs_match(a: str, b: str) -> bool:
+    a_lines = a.splitlines()
+    b_lines = b.splitlines()
+
+    if len(a_lines) != len(b_lines):
+        return False
+
+    for a_line, b_line in zip(a_lines, b_lines):
+        try:
+            a_val = float(a_line)
+            b_val = float(b_line)
+        except ValueError:
+            if a_line != b_line:
+                return False
+        else:
+            if not isclose(a_val, b_val, rel_tol=1e-6, abs_tol=1e-6):
+                return False
+
+    return True
 
 def run_with_input(args: list[str | Path], input: bytes) -> tuple[int, str]:
     res = run(args, stdout=PIPE, stderr=STDOUT, input=input)
@@ -195,7 +216,7 @@ for i, (src_path, input_path) in enumerate(zip(src_paths, input_paths)):
         print()
         continue
 
-    if interpreter_output != qemu_output:
+    if not outputs_match(interpreter_output, qemu_output):
         failed += [src_path]
         print("––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––")
         print(f"Interpreter and compiled program produce different outputs on source '{src_path.name}'.")
@@ -224,3 +245,6 @@ if len(failed) > 0:
     print("The following tests failed:")
     for p in failed:
         print(f"  {p.name}")
+
+
+

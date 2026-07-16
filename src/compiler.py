@@ -125,7 +125,7 @@ if verbose:
 
 if verbose:
     print("\n===== CLOSURE CONVERSION =====\n")
-ast = closure_conv(ast)
+ast = closure_conv(ast, types)
 if verbose:
     print(ast_5_closures.pretty(ast))
 

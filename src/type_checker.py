@@ -264,8 +264,10 @@ def check_expr(ctx: TCtx, e: Expr, ty: Type) -> None:
                     new_ctx = ctx.copy()
                     new_ctx.update(zip(xs, arg_tys))
                     check_expr(new_ctx, body, ret_ty)
+                    ctx.update(zip(xs, arg_tys))
                 case _:
                     raise TypeError(f"Lambda cannot have type {pretty_type(ty)}.")
+
         case _:
             te = type_check_expr(ctx, e)
             check_type_equal(te, ty, e)

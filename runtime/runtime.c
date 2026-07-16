@@ -114,8 +114,11 @@ void gc_init(
 } 
 
 bool gc_contains_heap_ptr(int64_t* p) {
-  return *p & 1;
+  if (!(*p & 1)) return false;
+  int64_t* candidate = (int64_t*) (((int8_t*) *p) - 1);
+  return candidate >= gc_fromspace_begin && candidate < gc_fromspace_end;
 }
+
 
 bool gc_is_forwarded(int64_t* p) {
   return *p & 1;

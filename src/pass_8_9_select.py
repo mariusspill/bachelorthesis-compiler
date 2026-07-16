@@ -39,7 +39,7 @@ def select_stmt(end_label: Label, s: src.Stmt, types: dict) -> IList[tgt.Instr]:
     match s:
         case src.SPrint(e):
             atom = select_atom(e)
-            if types.get(atom) == TFloat():
+            if is_float_atom(atom, types):
                 tmp = Id.fresh("tmp")
                 return ilist(                
                 tgt.Move(tmp, tgt.Offset(select_atom(e), 7)),
@@ -84,9 +84,14 @@ def select_stmt(end_label: Label, s: src.Stmt, types: dict) -> IList[tgt.Instr]:
                         tgt.Instr2("sub", select_lhs(lhs), tgt.Const(2, "64bit"), select_atom(e))
                     )
                 case "-":
-                    return ilist(
-                        tgt.Instr2("sub", select_lhs(lhs), tgt.Const(0, "64bit"), select_atom(e))
-                    )
+                    if is_float_atom(select_atom(e), types):
+                        return ilist(
+                            tgt.Instr2("xor", select_lhs(lhs), select_atom(e), tgt.Const(1 << 63, "64bit"))
+                        )
+                    else:
+                        return ilist(
+                            tgt.Instr2("sub", select_lhs(lhs), tgt.Const(0, "64bit"), select_atom(e))
+                        )
                 case "int_to_float":
                     lhs_out = select_lhs(lhs)
                     tmp = Id.fresh("tmp")
@@ -100,7 +105,7 @@ def select_stmt(end_label: Label, s: src.Stmt, types: dict) -> IList[tgt.Instr]:
             lh = select_lhs(lhs)
             e1a = select_atom(e1)
             e2a = select_atom(e2)
-            if types.get(e1a) == TFloat() and types.get(e2a) == TFloat():
+            if is_float_atom(e1a, types) and is_float_atom(e2a, types):
                 tmp1 = Id.fresh("tmp")
                 tmp2 = Id.fresh("tmp")
 
@@ -135,7 +140,7 @@ def select_stmt(end_label: Label, s: src.Stmt, types: dict) -> IList[tgt.Instr]:
             lhs_out = select_lhs(lhs)
             e1a = select_atom(e1)
             e2a = select_atom(e2)
-            if types.get(e1a) == TFloat() and types.get(e2a) == TFloat():
+            if is_float_atom(e1a, types) and is_float_atom(e2a, types):
                 tmp1 = Id.fresh("tmp")
                 tmp2 = Id.fresh("tmp")
                 result = ilist(
@@ -298,7 +303,7 @@ def select_stmt(end_label: Label, s: src.Stmt, types: dict) -> IList[tgt.Instr]:
         case src.SIf(src.EOp2Comp(e1, op, e2), body_label, orelse_label):
             e1a = select_atom(e1)
             e2a = select_atom(e2)
-            if types.get(e1a) == TFloat() and types.get(e2a) == TFloat():
+            if is_float_atom(e1a, types) and is_float_atom(e2a, types):
                 tmp1 = Id.fresh("tmp")
                 tmp2 = Id.fresh("tmp")
                 result = ilist(
@@ -371,3 +376,13 @@ def select_atom(e: src.ExprAtom) -> tgt.Const | Id:
             return tgt.Const(c, size)
         case src.EVar(x):
             return x
+        
+
+def is_float_atom(e: tgt.Const | tgt.ConstFloat | Id, types: dict) -> bool:
+    match e:
+        case tgt.ConstFloat(_):
+            return True
+        case tgt.Const(_, _):
+            return False
+        case Id():
+            return types.get(e) == TFloat()

@@ -1,3 +1,5 @@
+import types
+
 import ast_2_shrunk as src
 import ast_2_shrunk as tgt
 from identifier import Id
@@ -42,10 +44,10 @@ def uniquify_stmts(renaming: dict[Id, Id], ss: IList[src.Stmt], types:dict) -> I
 def uniquify_stmt(renaming: dict[Id, Id], s: src.Stmt, types: dict) -> tgt.Stmt:
     match s:
         case src.SExpr(e):
-            e = uniquify_expr(renaming, e)
+            e = uniquify_expr(renaming, e, types)
             return tgt.SExpr(e)
         case src.SPrint(e):
-            e = uniquify_expr(renaming, e)
+            e = uniquify_expr(renaming, e, types)
             return tgt.SPrint(e)
         case src.SAssign(x, e):
             if x in renaming:
@@ -58,7 +60,7 @@ def uniquify_stmt(renaming: dict[Id, Id], s: src.Stmt, types: dict) -> tgt.Stmt:
                     del(types[x])
 
                 renaming[x] = y
-            e = uniquify_expr(renaming, e)
+            e = uniquify_expr(renaming, e, types)
             return tgt.SAssign(y, e)
         case src.SIf(e, b1, b2):
             e = uniquify_expr(renaming, e)
@@ -66,11 +68,11 @@ def uniquify_stmt(renaming: dict[Id, Id], s: src.Stmt, types: dict) -> tgt.Stmt:
             b2 = uniquify_stmts(renaming, b2, types)
             return tgt.SIf(e, b1, b2)
         case src.SWhile(e, b):
-            e = uniquify_expr(renaming, e)
-            b = uniquify_stmts(renaming, b)
+            e = uniquify_expr(renaming, e, types)
+            b = uniquify_stmts(renaming, b, types)
             return tgt.SWhile(e, b)
         case src.SReturn(e):
-            e = uniquify_expr(renaming, e)
+            e = uniquify_expr(renaming, e, types)
             return tgt.SReturn(e)
 
 def uniquify_expr(renaming: dict[Id, Id], e: src.Expr, types: dict = None) -> tgt.Expr:
@@ -84,35 +86,37 @@ def uniquify_expr(renaming: dict[Id, Id], e: src.Expr, types: dict = None) -> tg
         case src.EInput():
             return tgt.EInput()
         case src.EOp1(op, e1):
-            e1 = uniquify_expr(renaming, e1)
+            e1 = uniquify_expr(renaming, e1, types)
             return tgt.EOp1(op, e1)
         case src.EOp2(e1, op, e2):
-            e1 = uniquify_expr(renaming, e1)
-            e2 = uniquify_expr(renaming, e2)
+            e1 = uniquify_expr(renaming, e1, types)
+            e2 = uniquify_expr(renaming, e2, types)
             return tgt.EOp2(e1, op, e2)
         case src.EIf(e1, e2, e3):
-            e1 = uniquify_expr(renaming, e1)
-            e2 = uniquify_expr(renaming, e2)
-            e3 = uniquify_expr(renaming, e3)
+            e1 = uniquify_expr(renaming, e1, types)
+            e2 = uniquify_expr(renaming, e2, types)
+            e3 = uniquify_expr(renaming, e3, types)
             return tgt.EIf(e1, e2, e3)
         case src.ETupleAccess(e, i):
-            return tgt.ETupleAccess(uniquify_expr(renaming, e), i)
+            return tgt.ETupleAccess(uniquify_expr(renaming, e, types), i)
         case src.ETupleLen(e):
-            return tgt.ETupleLen(uniquify_expr(renaming, e))
+            return tgt.ETupleLen(uniquify_expr(renaming, e, types))
         case src.ETuple(es):
-            return tgt.ETuple(uniquify_exprs(renaming, es))
+            return tgt.ETuple(uniquify_exprs(renaming, es, types))
         case src.ECall(e_func, e_args):
-            return tgt.ECall(uniquify_expr(renaming, e_func), uniquify_exprs(renaming, e_args))
+            return tgt.ECall(uniquify_expr(renaming, e_func, types), uniquify_exprs(renaming, e_args, types))
         case src.ELambda(params, body):
-            # Always use new names for the parameters in a lambda,
-            # as they shadow variables with the same name from the outside.
             renaming = renaming.copy()
             new_params: IList[Id] = ilist()
             for p in params:
                 p_new = Id.fresh(p.name)
                 renaming[p] = p_new
+                if types is not None and p in types:
+                    types[p_new] = types[p]
+                    del types[p]
                 new_params += ilist(p_new)
-            return tgt.ELambda(new_params, uniquify_expr(renaming, body))
+            return tgt.ELambda(new_params, uniquify_expr(renaming, body, types))
 
-def uniquify_exprs(renaming: dict[Id, Id], es: IList[src.Expr]) -> IList[tgt.Expr]:
-    return IList([uniquify_expr(renaming, e) for e in es])
+
+def uniquify_exprs(renaming: dict[Id, Id], es: IList[src.Expr], types: dict) -> IList[tgt.Expr]:
+    return IList([uniquify_expr(renaming, e, types) for e in es])
