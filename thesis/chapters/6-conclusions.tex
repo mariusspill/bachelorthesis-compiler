@@ -18,6 +18,8 @@ Always boxing floats is memory-inefficient and leads to more frequent garbage co
 
 There is a known bug in how chained, nested closures are compiled, most likely located in code generation or register allocation (see chapter 5).
 
+While reviewing the runtime's register classification, I also found that the check identifying floating-point registers matched any register name starting with the letter \texttt{f}, which would have misclassified the frame pointer (\texttt{fp}) as a floating-point register. This was never triggered in practice, since \texttt{fp} never reaches that dispatch as a move operand, but the check has since been tightened to match the exact float-register naming convention instead.
+
 \section{Future Work}
 
 A possible optimization for the compiler would be to allow floats to be spilled to the stack as well. The main obstacle is the bit-tagging scheme used to distinguish ints and pointers on the stack (see chapter 3).

@@ -6,7 +6,7 @@ The practice of testing against the interpreter as the language definition was c
 
 One caveat did arise: the float representation of the print function differs between Python and C. Although the underlying value is the same, the C representation uses more digits after the decimal point (e.g. 3.2 vs. 3.200000000), so outputs were compared for similarity rather than exact equality, to avoid false negatives.
 
-This also surfaced a related, known limitation: occasionally the output contains a small rounding error, e.g. 3.100000001 instead of 3.100000, which traces back to Python's internal float representation rather than to the compiler itself.
+This also surfaced a related, known formatting difference: occasionally the two rendered outputs disagree in their final decimal digit, e.g. 3.100000 versus 3.099999 for what is otherwise the same value. The underlying IEEE 754 binary representation is identical in both languages; the difference comes from how each language's print function rounds that binary value into a decimal string. C's \texttt{printf("\%f")} always rounds to a fixed six decimal places, while Python's \texttt{print} uses the shortest decimal string that round-trips back to the exact same binary value. When the true binary value sits close to a decimal rounding boundary, these two independent rounding strategies can disagree in the last digit, even though neither is incorrect.
 
 
 \section{Literals and Arithmetic}

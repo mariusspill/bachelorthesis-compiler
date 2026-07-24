@@ -25,7 +25,7 @@ To preserve strict semantic fidelity, I opted for a unified 64-bit double-precis
 
 \subsection{Type-System Generalization}
 Beyond validating literals, the type-checker's expression evaluation routines needed a clean refactoring. Originally, the compiler assumed almost everything was an integer, evaluating binary operators and functions like \texttt{print()} by checking them directly against a hardcoded \texttt{TInt()} type.
-To support floating-point numbers without copying and pasting the same validation logic everywhere, this rigid approach was replaced with a more flexible system. A new helper function, \texttt{check\_types\_supported}, was introduced to validate expressions against a list of acceptable types instead of just one. For this first iteration, operands must still match exactly—meaning mixed-type operations like \texttt{float + int} are blocked for now. However, this refactor ensures that expressions evaluate to and return their correct type primitive (like \texttt{TFloat()}) rather than defaulting to an integer, laying the clean groundwork for future cross-type arithmetic.
+To support floating-point numbers without copying and pasting the same validation logic everywhere, this rigid approach was replaced with a more flexible system. A new helper function, \texttt{check\_types\_supported}, was introduced to validate expressions against a list of acceptable types instead of just one. For this first iteration, operands must still match exactly—meaning mixed-type operations like \texttt{float + int} are blocked for now; this constraint is relaxed later, in Section~\ref{sec:type-coercion}. However, this refactor ensures that expressions evaluate to and return their correct type primitive (like \texttt{TFloat()}) rather than defaulting to an integer, laying the clean groundwork for future cross-type arithmetic.
 
 \subsection{Interpreter Semantics}
 Extending the runtime behavior in the interpreter was the most straightforward step because the interpreter itself is written in Python, which already supports 64-bit floating-point math natively.
@@ -139,7 +139,7 @@ RISC-V only provides \texttt{feq.d} (equal), \texttt{flt.d} (less than), and \te
 
 \subsection{Branching on Comparison Results}
 
-The branching case differs structurally from the integer path. For integers, RISC-V can compare and branch in a single instruction (e.g.\ \texttt{blt rs1, rs2, label}). For floats, this is not possible---no float branch instructions exist. Instead, the compiler emits the float comparison into a temporary integer register and then branches on that register with \texttt{bne} (branch if not equal to zero).
+The branching case differs structurally from the integer path. For integers, RISC-V can compare and branch in a single instruction (e.g.\ \texttt{blt rs1, rs2, label}). For floats, this is not possible---no float branch instructions exist. Instead, the compiler emits the float comparison into a temporary integer register, materializes zero into a second register, and branches with \texttt{bne} between the two.
 
 \subsection{Walkthrough of Generated Assembly}
 
@@ -158,7 +158,7 @@ The following walkthrough shows the branching case. As with any float operation,
 \end{lstlisting}
 
 
-\section{Type Coercion for Mixed Integer and Float Operations}
+\section{Type Coercion for Mixed Integer and Float Operations}\label{sec:type-coercion}
 
 The first change required was relaxing the type checker. Previously, binary operations required both operands to have the same type. This constraint was loosened so that operands need only be individually valid for the operation---for instance, both \texttt{TInt} and \texttt{TFloat} are permitted for arithmetic---without requiring them to match. When at least one operand is a float, the result type is \texttt{TFloat}.
 
