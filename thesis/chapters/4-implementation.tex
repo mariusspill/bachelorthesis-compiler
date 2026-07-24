@@ -14,7 +14,7 @@ To establish clear verification metrics, a differential test suite containing ha
 Extending the interpreter required systematic modifications across three core subsystems of the pipeline: the abstract syntax tree (AST) parser, the static type-checker, and the evaluation semantics engine.
 
 \subsection{Syntactic Extensions (The Parser)}
-Extending the frontend parser was highly deterministic because the host language's \texttt{ast} module natively recognizes floating-point tokens. The internal AST grammar definition was upgraded to allow literal expression nodes (\texttt{EConst}) to hold float primitives alongside integers. Additionally, the type-mapping routines were extended to recognize and propagate explicit variable type annotations, allowing patterns such as \texttt{a : float = 3.14} to pass successfully through the front-end token stream.
+Extending the frontend parser was highly deterministic because the host language's \texttt{ast} module natively recognizes floating-point tokens. Rather than extending the existing literal node, a separate \texttt{EConstFloat} node was introduced alongside \texttt{EConst}, present in every AST from the source-level representation onward. Additionally, the type-mapping routines were extended to recognize and propagate explicit variable type annotations, allowing patterns such as \texttt{a : float = 3.14} to pass successfully through the front-end token stream.
 
 \subsection{Static Semantics and the 64-Bit Precision Decision}
 The primary design challenge emerged during the static analysis phase within the type-checking subsystem. Because the compiler targets the RV64GC architecture—which natively supports both single-precision ('F') and double-precision ('D') floating-point extensions—implementing 32-bit floats offered tempting advantages in implementation expediency, specifically minimizing heap pressure and reducing the footprint of boxed values. However, forcing a 32-bit representation would introduce semantic drift from standard Python behavior, which treats all floating-point numbers as 64-bit doubles; common decimals like \texttt{0.1} or \texttt{3.14} would suffer silent precision loss. This directly conflicts with the design philosophy established in Chapter~\ref{chap:design_architecture}, which prioritises preserving Python's semantics over efficiency and implementation simplicity.
@@ -44,7 +44,7 @@ A complication arose for values held inside tuples (and for closures, functions,
 
 The result was a dictionary that, for each such structure, uses its identifier as the key and stores its fields or elements together with their corresponding types as the value. This dictionary is returned from the type checker to the main compiler driver, stored there, and passed on to every pass that requires it.
 
-Up to this point in the pipeline, three passes consume the dictionary. The first is uniquify, which renames variables and must therefore update the dictionary's keys so that the recorded types remain reachable under the new names. The second is closure conversion, discussed below. The third is the heap allocator, for which the dictionary was originally introduced, where it is used to decide whether a given element is a float.
+Up to this point in the pipeline, four passes consume the dictionary. The first is uniquify, which renames variables and must therefore update the dictionary's keys so that the recorded types remain reachable under the new names. The second is closure conversion, discussed below. The third is monadic normalisation, discussed in Section~\ref{sec:transient-float-registers}, which must propagate types onto the fresh temporaries it introduces. The fourth is the heap allocator, for which the dictionary was originally introduced, where it is used to decide whether a given element is a float.
 
 \subsection{Preserving Types Through Closure Conversion}
 
@@ -99,7 +99,7 @@ When the program calls \texttt{print(a)}, the compiler emits instructions to unb
 
 With literals and printing working, the next step was arithmetic. The base compiler only supported addition and subtraction for integers, so multiplication (\texttt{*}) and division (\texttt{/}) had to be added to the parser, type checker, and every intermediate AST regardless of floats. For floating-point values, RISC-V provides native double-precision instructions for all four operations: \texttt{fadd.d}, \texttt{fsub.d}, \texttt{fmul.d}, and \texttt{fdiv.d}.
 
-\subsection{Transient Use of Float Registers}
+\subsection{Transient Use of Float Registers}\label{sec:transient-float-registers}
 
 The central design choice for arithmetic was to keep float registers as a transient detour rather than a place where values live. The instruction selection pass emits the following sequence for every float operation: move both unboxed operands from integer registers into \texttt{fa0} and \texttt{fa1} with \texttt{fmv.d.x}, perform the operation (e.g.\ \texttt{fadd.d fa0, fa0, fa1}), move the result back to an integer register with \texttt{fmv.x.d}, and box it on the heap immediately. Float registers are therefore never live across instruction boundaries from the register allocator's perspective.
 

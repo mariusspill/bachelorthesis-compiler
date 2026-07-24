@@ -239,4 +239,4 @@ def patch_store_offset(rs: Register, o: src.Offset, rtmp: Register) -> tgt.Block
             return out
 
 def is_fp_register(r: Register) -> bool:
-    return r.name.startswith("f")
+    return len(r.name) > 2 and r.name[0] == "f" and r.name[1] in "tsa" and r.name[2:].isdigit()

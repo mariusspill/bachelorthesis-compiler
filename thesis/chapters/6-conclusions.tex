@@ -10,7 +10,7 @@ To keep track of the types determined by the type checker, a type dictionary was
 
 Floats leaving a register were always boxed and stored on the heap, giving a single, uniform representation to work with at every later stage. The garbage collector was extended to support this representation correctly.
 
-A set of 23 tests was created to validate expected behavior across all features. All but one passed; the exception is discussed below.
+A set of 23 tests was written to validate expected behavior across all features. 22 of these are part of the passing test suite; the remaining one was isolated as a documented limitation and is discussed below.
 
 \subsection{Limitations}
 
