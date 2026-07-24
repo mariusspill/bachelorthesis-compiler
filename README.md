@@ -23,3 +23,7 @@ The `./do` script wraps everything in Docker (gcc for RISC-V, QEMU, Python):
 ```
 
 Pass `--no-docker` / `-nd` to run any command directly on the host instead.
+
+## License
+
+MIT — see [`LICENSE`](LICENSE).

@@ -59,11 +59,11 @@ When one or more operands of an operation are floats, the allocator emits a bloc
 
 \section{Float Literal Support End to End}
 
-With the heap-based boxing design fully implemented, the next task was to support float literals through the entire compiler pipeline, from instruction selection down to executable assembly. The test program \texttt{float\_literal.py} (see Appendix) served as the target: it assigns a float literal to a variable and prints it.
+With the heap-based boxing design fully implemented, the next task was to support float literals through the entire compiler pipeline, from instruction selection down to executable assembly. The test program \texttt{float\_literal.py} served as the target: it assigns a float literal to a variable and prints it.
 
 \subsection{Instruction Selection}
 
-The first pass that required modifications was instruction selection. As a prerequisite, I extended the register library to include all 32 floating-point registers defined by RISC-V (see Appendix): the temporary registers \texttt{ft0}--\texttt{ft11}, the saved registers \texttt{fs0}--\texttt{fs11}, and the argument registers \texttt{fa0}--\texttt{fa7}. Under the boxed-float strategy most of these registers are not yet used, since every float value resides on the heap and is only loaded into a register for a single operation before being stored back. Nonetheless, defining the full register set lays the groundwork for future optimisations such as keeping floats in registers across operations or spilling to the stack instead of the heap.
+The first pass that required modifications was instruction selection. As a prerequisite, I extended the register library to include all 32 floating-point registers defined by RISC-V: the temporary registers \texttt{ft0}--\texttt{ft11}, the saved registers \texttt{fs0}--\texttt{fs11}, and the argument registers \texttt{fa0}--\texttt{fa7}. Under the boxed-float strategy most of these registers are not yet used, since every float value resides on the heap and is only loaded into a register for a single operation before being stored back. Nonetheless, defining the full register set lays the groundwork for future optimisations such as keeping floats in registers across operations or spilling to the stack instead of the heap.
 
 Inside the pass itself, I threaded the types dictionary from the compiler driver down to instruction selection so that the pass could determine whether a value should be directed to a floating-point register or an integer register. Accessing a boxed float requires unboxing: loading from byte offset~7 of the tagged heap pointer to reach the payload field of the box.
 
