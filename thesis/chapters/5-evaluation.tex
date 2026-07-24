@@ -1,4 +1,48 @@
 \chapter{Evaluation}\label{chap:evaluation}
-Correctness Validation: Instead of standard benchmarks or accuracy percentages, compiler evaluations validate determinism and compliance. Explain your test suite framework.
-Test Cases: Discuss how you validated corner cases (e.g., parsing precision limits, type coercion, complex floating-point expressions).
-Performance (Optional): If you optimize passes or look at compilation times, present it here. Otherwise, focus heavily on functional correctness and compilation validation.
+
+Development was based on 20 predesigned tests intended to ensure basic functionality and feature support, along with 3 additional tests written after completing the implementation to stress-test it and cover edge cases, on top of the 141 tests already present from the original compiler.
+
+The practice of testing against the interpreter as the language definition was continued from earlier work: before writing any compiler code, I first defined the expected behavior via the interpreter.
+
+One caveat did arise: the float representation of the print function differs between Python and C. Although the underlying value is the same, the C representation uses more digits after the decimal point (e.g. 3.2 vs. 3.200000000), so outputs were compared for similarity rather than exact equality, to avoid false negatives.
+
+This also surfaced a related, known limitation: occasionally the output contains a small rounding error, e.g. 3.100000001 instead of 3.100000, which traces back to Python's internal float representation rather than to the compiler itself.
+
+
+\section{Literals and Arithmetic}
+
+These tests cover storing floats in variables, printing them, and performing basic arithmetic (addition, subtraction, and so on). Since this was a required feature, the implementation had to guarantee that it was fully supported.
+
+\section{Comparison and Coercion}
+
+This builds on the basic arithmetic tests. Comparisons required a different set of operations to be supported, and their results had to be handled differently from arithmetic results. Tests such as compare capture this by storing the result of a greater-than-or-equal comparison in a variable.
+
+For coercion, I tested that the result has the correct representation and that operands of mixed types are converted correctly before the operation is applied.
+
+\section{Control Flow}
+
+These tests were targeted at making sure the extension did not break already-working features: if and while statements should not behave any differently with floats than they do with other data types, and these tests confirm that this holds.
+
+\section{Functions and Closures}
+
+These tests were designed to check that function return types were propagated correctly. In doing so, they uncovered a bug in which type information for a closure's captured variables and parameters was lost during closure conversion. As a result, references to captured float variables inside a closure's body were treated as plain integers further down the pipeline.
+
+The fix was to thread the type dictionary through the closure conversion pass and to record a local type map for each generated closure function (see chapter 4 for details).
+
+\section{Data Structures and Objects}
+
+The main purpose of these tests was to exercise the functionality of boxed floats. Since every object, function, and data structure that has a float as a field is itself represented as a tuple, any such float had to be boxed within it.
+
+Because this transformation was already implemented, these tests checked whether anything broke as a result of the new way float values were handled.
+
+They also verify that boxing and unboxing inside these structures is handled correctly. The design of these tests influenced decisions such as boxing itself, since they were written before the corresponding implementation, as a way to explore how the internals should work and what needed to be supported.
+
+In that sense, these tests directly laid the foundation for the decision to box floats.
+
+\section{Stress tests and Edge Cases}
+
+After finishing the core implementation, I wrote three additional test files specifically designed to test edge cases and to stress-test the garbage collector.
+
+Even under roughly 2000 heap allocations performed in a tight loop, the garbage collector handled collection correctly and reasonably quickly. The same held for the edge-case value tests, which covered very small, very large, and signed-zero floats.
+
+The test involving nested, chained closures revealed a real limitation: using the result of one closure call as the argument to another produced an incorrect value. The most likely cause lies somewhere in code generation or register allocation for chained closure calls, though the exact root cause was not conclusively identified within the scope of this thesis. This test was therefore moved into a separate, clearly labeled limitations folder and is discussed here rather than counted among the passing test suite.

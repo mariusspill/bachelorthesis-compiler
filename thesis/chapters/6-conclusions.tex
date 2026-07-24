@@ -1,2 +1,25 @@
 \chapter{Conclusion}\label{chap:conclusion}
-Short summary of your execution and a couple of bullet points on future work (e.g., supporting double-precision, floating-point optimization passes, or array allocations of floating-point numbers).
+
+The work of this thesis was to extend a Nanopass Python-to-RISC-V compiler, originally developed for the Compiler Construction lecture and supporting bools, ints, and tuples, with support for floating-point values across all operations.
+
+\section{Deliverables}
+
+The ASTs were extended with a new \texttt{ConstFloat} type, and instruction selection was extended to emit RISC-V floating-point instructions for all supported operations. A new unary operation was introduced to convert an int to a float where necessary, for coercion.
+
+To keep track of the types determined by the type checker, a type dictionary was introduced and threaded through the pipeline. Where later passes performed renaming or restructuring, such as during closure conversion, the dictionary was updated accordingly so that the recorded types remained valid.
+
+Floats leaving a register were always boxed and stored on the heap, giving a single, uniform representation to work with at every later stage. The garbage collector was extended to support this representation correctly.
+
+A set of 23 tests was created to validate expected behavior across all features. All but one passed; the exception is discussed below.
+
+\subsection{Limitations}
+
+Always boxing floats is memory-inefficient and leads to more frequent garbage collector activity.
+
+There is a known bug in how chained, nested closures are compiled, most likely located in code generation or register allocation (see chapter 5).
+
+\section{Future Work}
+
+A possible optimization for the compiler would be to allow floats to be spilled to the stack as well. The main obstacle is the bit-tagging scheme used to distinguish ints and pointers on the stack (see chapter 3).
+
+One way to achieve this would be a dual stack, with one designated region for floats and one for ints. Another would be to extend the type-tracking mechanism to inform the register allocator directly, allowing floats and ints to share the same stack space while remaining distinguishable. 

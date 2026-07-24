@@ -54,27 +54,9 @@ def alloc_expr(e: src.Expr, types: dict) -> tgt.Expr:
         case src.EConstFloat(c):
             body: IList[tgt.Stmt] = ilist()
 
-            num_words = 2 # one for the header, one for the float
-            num_bytes = num_words * 8
+            v, body_t = make_float_box(1, types)
 
-            # Start a garbage collection if we're out of memory.
-            body += ilist(
-                tgt.SIf(
-                    tgt.EOp2(
-                        tgt.EOp2(tgt.EGlobal('gc_free_ptr'), '+', tgt.EConst(num_bytes, '64bit')),
-                        '<',
-                        tgt.EGlobal('gc_fromspace_end')
-                    ),
-                    ilist(),
-                    ilist(tgt.SCollect(num_words)),
-                )
-            )
-
-            # Allocate space for the float
-            v = Id.fresh("v")
-            body += ilist(tgt.SAssign(tgt.LId(v), tgt.EAllocate(1))) # one because it needs eight bytes (64-bit) for a float or one word
-
-            types[v] = TFloat()
+            body += body_t
 
             x = Id.fresh("flt")
             body += ilist(tgt.SAssign(tgt.LId(x), tgt.EConstFloat(c)))
@@ -97,10 +79,6 @@ def alloc_expr(e: src.Expr, types: dict) -> tgt.Expr:
             isf1 = is_float(e1, types)
 
             if isf1:
-
-                num_words = 2
-                num_bytes = num_words * 8
-
                 body: IList[tgt.Stmt] = ilist()
 
                 t1 = Id.fresh("flt")
@@ -111,25 +89,9 @@ def alloc_expr(e: src.Expr, types: dict) -> tgt.Expr:
                 unboxed1 = tgt.ETupleAccess(tgt.EVar(t1), 0)
 
                 
+                v, body_t = make_float_box(1, types)
 
-                # Start a garbage collection if we're out of memory.
-                body += ilist(
-                    tgt.SIf(
-                        tgt.EOp2(
-                            tgt.EOp2(tgt.EGlobal('gc_free_ptr'), '+', tgt.EConst(num_bytes, '64bit')),
-                            '<',
-                            tgt.EGlobal('gc_fromspace_end')
-                        ),
-                        ilist(),
-                        ilist(tgt.SCollect(num_words)),
-                    )
-                )
-
-                # Allocate space for the tuple
-                v = Id.fresh("v")
-                body += ilist(tgt.SAssign(tgt.LId(v), tgt.EAllocate(1)))
-
-                types[v] = TFloat()
+                body += body_t
 
 
                 x = Id.fresh("flt")
@@ -152,8 +114,6 @@ def alloc_expr(e: src.Expr, types: dict) -> tgt.Expr:
             isf2 = is_float(e2, types)
 
             if isf1 or isf2:
-                num_words = 2 # one for the header, one for the float
-                num_bytes = num_words * 8
 
                 if isf1:
                     t1 = Id.fresh("flt")
@@ -177,26 +137,11 @@ def alloc_expr(e: src.Expr, types: dict) -> tgt.Expr:
                     unboxed2 = tgt.EOp1("int_to_float", e2_out)
 
                 if op == '+' or op == '-' or op == '*' or op == '/':
-                    # Start a garbage collection if we're out of memory.
-                    body += ilist(
-                        tgt.SIf(
-                            tgt.EOp2(
-                                tgt.EOp2(tgt.EGlobal('gc_free_ptr'), '+', tgt.EConst(num_bytes, '64bit')),
-                                '<',
-                                tgt.EGlobal('gc_fromspace_end')
-                            ),
-                            ilist(),
-                            ilist(tgt.SCollect(num_words)),
-                        )
-                    )
-
                     # Allocate space for the tuple
-                    v = Id.fresh("v")
 
-                    types[v] = TFloat()
- 
-                    body += ilist(tgt.SAssign(tgt.LId(v), tgt.EAllocate(1)))
+                    v, body_t = make_float_box(1, types)
 
+                    body += body_t
 
                     x = Id.fresh("flt")
                     types[x] = TFloat()
@@ -304,3 +249,35 @@ def is_float(e: src.Expr, types: dict) -> bool:
             return types.get(x) == TFloat()       
         case _:
             return False
+        
+
+def make_float_box(n:int, types: dict):
+    """
+    Creates the code creating a box for floats with a correct header for n flaots
+    """
+        # Start a garbage collection if we're out of memory.
+    num_words = 1 + n
+    num_bytes = num_words * 8
+
+    body: IList[tgt.Stmt] = ilist()
+    
+    body += ilist(
+        tgt.SIf(
+            tgt.EOp2(
+                tgt.EOp2(tgt.EGlobal('gc_free_ptr'), '+', tgt.EConst(num_bytes, '64bit')),
+                '<',
+                tgt.EGlobal('gc_fromspace_end')
+            ),
+            ilist(),
+            ilist(tgt.SCollect(num_words)),
+        )
+    )
+
+    v = Id.fresh("v")
+
+    types[v] = TFloat()
+
+    body += ilist(tgt.SAssign(tgt.LId(v), tgt.EAllocate(n)))
+
+    return v, body
+

@@ -1,6 +1,20 @@
 \chapter{Introduction}\label{chap:introduction}
-\section{Subchapter 1}
-The Hook: Why do we care about small/incremental compiler frameworks (like Nanopass)?
-\section{Subchapter 2}
-The Problem: What happens when a framework or downstream intermediate representation (IR) lacks native floating-point types? (e.g., restriction to purely integer arithmetic limits the computational expressiveness of the language).
-The Contribution: A brief high-level summary of what you added to the pipeline.
+The Nanopass architecture features a series of independent passes, each of which performs one small conversion or task, bringing the intermediate representation (IR) closer to the final assembly output.
+
+The strength of this architecture is that it is highly extensible~\citep{siek2023essentials}, allowing the existing compiler to be extended without overhauling the complete architecture.
+
+The textbook version and the lecture stop at the implementation of integers, booleans, and tuples, without any support for floating-point values. Yet any sufficiently sophisticated program will eventually need to work with floating-point values, since they are an integral part of any programming language.
+
+While the Nanopass architecture itself is highly extensible, the implementation still came with some hurdles, such as stack and heap allocation, register selection, instruction selection, and keeping track of type information to select the correct behavior at certain points in the pipeline (e.g., when calling a print function or selecting the appropriate register).
+
+Another challenge was that, unlike ints, bools, and other data types, no bit could be reserved for tagging inside a float's own word, since the encoding requires all 64 bits for the value itself.
+
+My implementation offers 64-bit floating-point support via IEEE 754 encoding, along with coercion for all original operations. These floating-point values use designated floating-point instructions from the RISC-V architecture.
+
+To avoid modifying the existing architecture, the extension was built alongside existing principles (such as bit tagging) rather than overhauling them. For situations where integers or pointers were tagged at the LSB, floats were instead boxed, with an encoding attached in the header.
+
+The garbage collector was extended to check each object's header before following its fields as pointers, skipping the payload entirely for boxed floats, since their fields never contain pointers.
+
+Furthermore, I extended the interpreter that defines the language's semantics and created a test suite of 23 tests to validate the compiler's behavior against it.
+
+Finally, in this thesis, I discuss design decisions and the pros and cons of various approaches, and document the implementation and its results.

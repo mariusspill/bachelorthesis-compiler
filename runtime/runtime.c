@@ -212,7 +212,7 @@ void gc_copy_and_swap_spaces(
   while(p< gc_free_ptr){
     uint64_t count = ((uint64_t) *p) >> 2;  
     if (*p & 0b10) {
-      p += 2;
+      p += (1 + count);
     } else {
       p++;
       for (uint64_t i = 0; i < count; i++) {

@@ -78,7 +78,7 @@ def compute_prelude(reg_alloc: RegAllocOutput, is_main: bool) -> tgt.Program:
             # the stack pointer when main was called.
             tgt.IInstr2("addi", a0, fp, -8 * (2 + len(reg_alloc.callee_saved))),
             # Argument 2 is the initial size for from- and to-space in words
-            tgt.IInstr1("li", a1, 4),
+            tgt.IInstr1("li", a1, 8),
             # Call gc init
             tgt.Call(Label("gc_init")),
         )

@@ -1,36 +1,25 @@
-# Exercise 9
+# Nanopass Python-to-RISC-V Compiler with Floating-Point Support
 
-Your task is to extend the compiler to support peephole optimizations.
+A Nanopass-style compiler that translates a subset of Python to RISC-V assembly, originally built for the Compiler Construction lecture (supporting bools, ints, and tuples) and extended as part of a bachelor's thesis to add full floating-point support — literals, arithmetic, comparisons, int/float coercion, closures, and the garbage-collector changes needed to support boxed floats safely.
 
-As always we already modified the interpreter, type checker, and syntax trees for you, so that you only have to extend the compiler passes.
+See [`thesis/`](thesis) for the full write-up: design decisions, implementation details, and evaluation.
 
-The following is a description of the non-trivial changes that have to be done to extend the compiler. Any change marked with a `TODO` will be your task to complete.
+## Structure
 
-## Optimize
+- [`src/`](src) — the compiler itself, organized as a sequence of small passes (parsing, type checking, closure conversion, heap allocation, instruction selection, register allocation, and more), each transforming one intermediate representation into the next.
+- [`runtime/`](runtime) — the C runtime, including `print_int64`/`print_float` and the copying garbage collector.
+- [`tests/`](tests) — the test suite, run against a reference interpreter; [`tests/float_ext/`](tests/float_ext) covers the floating-point extension specifically.
+- [`thesis/`](thesis) — the LaTeX source of the accompanying bachelor's thesis.
 
-We introduce a new pass `pass_10_10_optimize` which implements the peephole optimizations.
+## Usage
 
-- `TODO`: Any instruction `Instr2 op dst x y` where `x` and `y` are constants should be replaced by an equivalent move instruction. You may use the helper functions `simulate_over_and_underflow` and `to_int_64` when necessary.
+The `./do` script wraps everything in Docker (gcc for RISC-V, QEMU, Python):
 
-- `TODO`: Any instruction `Instr2 op dst x y` where `y` is a constant and the operation being executed is
-    - `x + 0`
-    - `x - 0`
-    - `x * 1`
-    - `x // 1`
-    - `x * 0`
+```
+./do compile PATH   # compile a Python source file to RISC-V assembly
+./do run PATH        # compile and run it under QEMU
+./do test [PATH]     # run the full test suite, or a specific test file/folder
+./do shell           # open a shell inside the container
+```
 
-    should be replaced by an equivalent move instruction.
-
-- `TODO`: Any instruction `Branch cc x y target` where `x` and `y` are constants should be replaced by a jump instruction or removed, depending on which is equivalent. Make sure that jump instructions only appear at the end of blocks so that no unreachable instructions remain.
-
-- `TODO`: Removing branch instructions might make some of the basic blocks unreachable, so filter out all unreachable blocks from the set of basic blocks for each function after applying the peephole optimizations.
-
-- `TODO`: Any instruction `Move x x` should be removed.
-
-- `TODO`: Any instruction `Move y x` directly preceded by `Move x y` should be removed. Make sure that removing a move instruction does not leave behind another possibilty for removal.
-
-##
-
-If stuff is unclear, don't hesitate to use the chat!
-
-*Happy Coding! <3*
+Pass `--no-docker` / `-nd` to run any command directly on the host instead.

@@ -44,7 +44,13 @@ A complication arose for values held inside tuples (and for closures, functions,
 
 The result was a dictionary that, for each such structure, uses its identifier as the key and stores its fields or elements together with their corresponding types as the value. This dictionary is returned from the type checker to the main compiler driver, stored there, and passed on to every pass that requires it.
 
-Up to this point in the pipeline, two passes consume the dictionary. The first is uniquify, which renames variables and must therefore update the dictionary's keys so that the recorded types remain reachable under the new names. The second is the heap allocator, for which the dictionary was originally introduced, where it is used to decide whether a given element is a float.
+Up to this point in the pipeline, three passes consume the dictionary. The first is uniquify, which renames variables and must therefore update the dictionary's keys so that the recorded types remain reachable under the new names. The second is closure conversion, discussed below. The third is the heap allocator, for which the dictionary was originally introduced, where it is used to decide whether a given element is a float.
+
+\subsection{Preserving Types Through Closure Conversion}
+
+Closure conversion runs between uniquify and the heap allocator, and unlike uniquify it does not merely rename variables - it moves a lambda's free variables and parameters into an entirely new top-level function, generated on the fly under a fresh label. Any type information recorded under the enclosing function's identifier is therefore no longer reachable from within the new function's scope, precisely where the allocator would later need it to decide whether a captured variable or parameter is a float.
+
+To keep this information reachable, closure conversion builds a small local type map for each lambda, restricted to its free variables and parameters, and registers it in the dictionary under the new function's own label, alongside the maps for the functions already present in the source program. This way, every function the allocator later encounters - whether written directly by the programmer or generated during closure conversion - has its own entry in the dictionary, keyed consistently by function identity.
 
 \subsection{Handling Floats inside the Heap Allocator}
 
@@ -177,3 +183,27 @@ The following listing shows the generated code for \texttt{3.2 * 3}, where the f
 \end{lstlisting}
 
 The first line unboxes the float operand. Lines two through five handle the integer: \texttt{li} loads the tagged value~6, \texttt{srli} untags it to~3, and \texttt{fcvt.d.l} converts the integer~3 to the double~3.0 in \texttt{fa0}. The result is then moved back to an integer register with \texttt{fmv.x.d}. Finally, both operands are moved into float registers and the multiplication is performed.
+
+\section{Extension of the Garbage Collector}
+
+The Garbage Collector has to be extended to know whether an allocated object is a boxed float or a tuple/closure. Because I decided to encode this directly in the object's header, the implementation only required small, local changes to the compiler and the runtime, rather than a new address space or a second pointer encoding.
+
+\subsection{Extending the Compiler}
+
+The decision to box a float, and the code that computes and stores its value, is made earlier in the pipeline, in \texttt{pass\_5\_6\_alloc.py}: whenever an expression produces a float, that pass allocates a single-slot container for it and emits a statement that writes the computed value into that slot, exactly like writing into any other tuple field.
+
+By the time \texttt{pass\_8\_9\_select} sees this allocation, boxing has already been decided - its job is only to choose the correct header encoding. When it lowers the allocation into a concrete header constant, it checks whether the variable being allocated is typed as a float. If it is, it sets bit~1 of the header in addition to the length that is already encoded in the upper bits; if not, bit~1 is left clear. The payload itself does not need any float-specific handling in this pass, since it is written using the same generic tuple-subscript-store logic that handles any other tuple field.
+
+\subsection{Extending the Runtime}
+
+The collector's sweep over to-space normally treats every word following an object's header as a potential pointer and checks it accordingly. This is exactly what would go wrong for a boxed float, since the raw bits of a double can easily satisfy that check by coincidence.
+
+The extended sweep loop first reads bit~1 of the header. If it is set, the loop skips both the header and the single payload word without inspecting the payload at all, advancing its scan pointer by two. If it is not set, the loop proceeds as before, checking each of the object's fields individually. This one bit is enough to keep the payload of a boxed float from ever being misread as a heap pointer during collection.
+
+\section{Generalizing the Float Box}
+
+Prior to this extension, every place that boxed a float - a literal, the result of a unary operation, and the result of a binary operation - duplicated the same steps: check whether a collection is needed, allocate the payload, and register the resulting variable's type. I consolidated this into a single helper, \texttt{make\_float\_box(n, types)}, in \texttt{pass\_5\_6\_alloc.py}, which performs the garbage-collection check and the allocation for a box of $n$ raw words and returns both the fresh box identifier and the statements needed to construct it. \texttt{EConstFloat}, \texttt{EOp1}, and \texttt{EOp2} all now call this helper with $n=1$, rather than repeating the same allocation logic three times.
+
+Instruction selection required no changes. The existing header-construction logic in \texttt{pass\_8\_9\_select.py} already computed \texttt{(num\_elems~<<~2)~|~0b10} generically from whatever length the allocation was given - it had simply never been called with anything other than~1.
+
+The one change genuinely required was in the runtime. The collector's sweep, on encountering a raw object, previously skipped exactly two words unconditionally, regardless of the header's own length field. I changed this to skip \texttt{1~+~count} words, where \texttt{count} is read directly from the header, exactly as it already was for scannable objects. For $n=1$ this computes $1+1=2$, identical to the previous behaviour, so no existing test could regress; for any $n>1$ the collector now correctly treats the box as a single unit and skips the entire payload without scanning it for pointers.

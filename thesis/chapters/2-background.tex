@@ -1,3 +1,30 @@
 \chapter{Background}\label{chap:background}
-The Nanopass Framework: Explain how the host compiler operates (small, discrete passes transforming highly specific AST micro-languages).
-Floating-Point Representation: Briefly introduce the target representation semantics (e.g., IEEE 754 standards) and how the target machine or runtime expects floats to be structured compared to integers.
+
+\section{The Nanopass Compiler}
+
+The compiler's architecture is based on Jeremy Siek's textbook \textit{Essentials of Compilation}~\citep{siek2023essentials}. The main idea is that instead of performing one huge transformation, the compilation process is separated into a sequence of passes, each with its own target representation and task.
+
+The first step is parsing the input program into an AST. Several third-party tools and libraries exist for parsing, and building one is not the scope of this thesis; this compiler relies on Python's own \texttt{ast} module~\citep{pythonastdocs}. Once a Python AST is available, each pass has a designated and well-specified task, leading to a clean architecture in which each module has its own job~\citep{martin2008cleancode}.
+
+Among these passes are, for example, flattening out functions, bringing a nested expression into a list of atomic expressions (monadic normal form), selecting instructions, and allocating addresses and space on the stack or heap.
+
+While the textbook and Professor Thimann's lecture cover many concepts of a compiler, support for floating-point values and their operations was not present in the textbook or lecture version of the compiler. During this thesis, I explored how the existing architecture could be extended to support floating-point values, which design decisions had to be made, and what alternatives existed.
+
+I ultimately arrived at an implementation of one such approach, which is discussed in the following chapters.
+
+\section{RISC-V}
+
+The target architecture of the compiler is the RISC-V instruction set architecture~\citep{waterman2016riscv}. RISC-V is an open instruction set architecture, originally developed at the University of California, Berkeley.
+
+RISC-V's design philosophy favors a reduced number of supported instructions, making it a comparatively simple and abstract architecture to target from a compiler.
+
+Unlike proprietary architectures, RISC-V is maintained as an open standard rather than by a single vendor, with multiple independent hardware and software implementations~\citep{waterman2016riscv}.
+
+
+\section{IEEE 754 Floating Point Representation}
+
+For encoding floating-point values, I decided to follow the industry standard, IEEE 754~\citep{ieee754-2019}. Under this standard, a double-precision float is represented as a 64-bit word consisting of 1 sign bit, an 11-bit exponent, and a 52-bit mantissa.
+
+Double precision is natively supported by the RISC-V architecture and matches the precision Python uses internally to represent floats~\citep{pythonfloatdocs}. A problem emerged with the existing compiler design, in which the least significant bit (LSB) of every value and pointer was used for tagging - something that is not possible with this encoding, since it requires all 64 bits.
+
+This was solved by boxing floats and encoding their type in the header of the box (see chapters 3 and 4).

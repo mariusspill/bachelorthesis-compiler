@@ -2,7 +2,7 @@
 
 \section{Design Philosophy}
 
-The governing principle of this extension was functionality first, optimisation second. This drove two central decisions. First, floats are represented as 64-bit doubles rather than 32-bit single-precision values, in order to preserve fidelity with Python's native semantics. Second, floats are stored as boxed heap objects rather than as raw values, accepting the cost of indirection in exchange for reusing the compiler's existing tuple and garbage-collection machinery. Performance optimisations were deferred until the base functionality for floats was complete, and were only revisited where time allowed.
+The governing principle of this extension was functionality first, optimisation second. This drove two central decisions. First, floats are represented as 64-bit doubles rather than 32-bit single-precision values, in order to preserve fidelity with Python's native semantics. Second, floats are stored as boxed heap objects rather than as raw values, accepting the cost of indirection in exchange for reusing the compiler's existing tuple and garbage-collection machinery. Performance optimisations were partly explored as part of this work, with the remainder left for future work.
 
 A related decision concerns mixed-type arithmetic. In any operation mixing an integer and a float, the integer operand is implicitly promoted to a float before the operation is performed, matching Python's native behaviour. This keeps a single arithmetic path for floats and confines the type difference to a conversion step at the operands. The design and placement of this conversion are discussed in Section~\ref{sec:coercion}.
 
@@ -20,9 +20,10 @@ One option would have been to store floats as raw values directly on the heap. T
 
 The approach I chose instead was to box every float inside a two-word heap block: one header word and one word holding the value of the float. The header identifies the block as a boxed float. This yields a uniform representation that can be used for literals, for variables, and for floats nested in any heap structure, all through the same interface.
 
-The intended behaviour is for the collector to recognise a boxed float from its header and to copy the payload word verbatim, without interpreting those raw bits as a pointer. As discussed in Section~\ref{sec:possible-improvements}, this header-aware handling is not yet in place.
+The intended behaviour is for the collector to recognise a boxed float from its header and to copy the payload word verbatim, without interpreting those raw bits as a pointer. Section~\ref{sec:gc-extension} describes how this header-aware handling was implemented.
 
 The advantage of boxing is that it offers a uniform design that delivers full functionality with little overhead and fits almost seamlessly into the existing compiler. The disadvantage is the inefficiency that arises from having to reach inside the box on every access to the value, and from allocating a fresh box for every float that is produced, which increases pressure on the collector. These costs were judged acceptable, since the trade-off aligned with the design philosophy of providing functionality before performance.
+
 
 \section{Conversion of Integers to Floats in Coercion Expressions}\label{sec:coercion}
 
@@ -42,4 +43,40 @@ A second and simpler alternative would have been to handle coercion entirely in 
 
 Efficiency could be improved by replacing bit tagging with a full layout or type map, which would permit storing raw floats directly on the heap rather than boxing them. Complementarily, the register allocator could be extended to distinguish floats from integers and to maintain a separate region of the stack for floating-point values, so that raw floats could be spilled to the stack just like integers, instead of being boxed and sent to the heap.
 
-Independently of performance, the boxing scheme is not yet fully sound under the copying collector. After an object is copied, the collector scans each of its words and tests the LSB to decide whether the word is a pointer to follow. Because a boxed float's payload is a raw 64-bit double, a value whose low bit happens to be~1 would be misinterpreted as a tagged pointer and erroneously followed. Making boxing correct therefore requires the header-aware traversal described above, so that the payload word of a float box is copied verbatim and never scanned as a pointer.
+
+\section{Garbage Collector Extension}\label{sec:gc-extension}
+
+Since bit tagging doesn't work for floats - because they need the whole 64 bits - they are boxed. Yet once the Garbage Collector follows the pointer to a boxed float, it still has to decide whether the box's payload is itself a pointer it needs to follow, or just a raw value. To solve this, the header of a boxed float gets a second tag bit (bit 1) marking it as raw data.
+
+Simple as that - if the Garbage Collector reads a header, it checks bit 1, and if it is set, skips over the payload instead of scanning it for pointers, then continues as usual.
+
+The simplicity and seamlessness of this approach is why I decided for it, but there is a more structural reason as well. The collector is a Cheney-style copying collector~\citep{cheney1970nonrecursive}, meaning it scans to-space sequentially rather than by following individual pointers. By the time the scan reaches a given object, it no longer knows which pointer led to it - the object itself is all the scan has to go on. Any alternative that moves the "raw or pointer" information onto the pointer instead of the object breaks that assumption.
+
+\subsection{Alternatives}
+
+One alternative would be to use 2 tag bits on the pointer itself, already encoding what kind of value it points to. This runs into exactly the problem above: the sequential to-space scan never has access to the pointer that led to an object, so the tag would have to be duplicated onto the object anyway, or the sequential scan would have to be replaced with an explicit worklist - giving up the main advantage of the algorithm. It is also harder to extend, since the number of tag bits needed grows with the number of distinct pointer kinds.
+
+Another alternative would be to use two separate address spaces, one for pointers and one for raw values. This would be extensible and clean but is likely overkill for this thesis.
+
+Because of these reasons, the simplicity of encoding the type in the header - which fits how the collector already traverses memory - was selected.
+
+
+\section{Generalizing the Float Box}
+
+The float box can be generalized to hold an arbitrary number of raw values instead of exactly one, without any change to the front end or to how tuples work.
+
+I kept the box and the tuple as separate concepts rather than merging them. A tuple containing a float is unchanged: each float is still its own length-one box, referenced by a pointer from the tuple's field. What changed is the box-construction mechanism itself, which now takes a length~$n$ - every existing call site still passes $n=1$.
+
+Nothing yet constructs a box with $n>1$; this generalizes the mechanism, not any consumer of it. Reading a boxed float always accesses position~0, which is a fixed offset regardless of $n$, so this required no change.
+
+I did not cap the number of elements a box can hold. The header only spends two of its 64 bits on the forwarding and raw-data flags, leaving roughly 62 bits for the length - far beyond the required $2^{16}$ or $2^{32}$. A cap would add complexity for no benefit, since every value of $n$ is chosen by the compiler itself at compile time.
+
+\subsection{Alternatives}
+
+Representing an "array of floats" as a special-cased tuple - detecting an all-float tuple and storing its elements inline - was rejected, since it conflates two things that are cleanly separate today: a tuple's fields may independently be integers, pointers, or boxed floats, while a box's payload is exclusively one kind of raw data.
+
+A dedicated bit field for the count, separate from the header's existing length field, was also rejected: the length field was never actually limited to one word, only ever used that way. Reusing it keeps the fix backward compatible - for $n=1$ it produces exactly the same header and collector behaviour as before.
+
+\subsection{Possible Improvements}
+
+An array type built on top of this - fixed, compile-time-constant size and indices - would be the natural next step. A genuinely runtime-sized or runtime-indexed array would additionally require computing addresses from a register, since RISC-V's loads and stores only support a base register plus an immediate offset.
