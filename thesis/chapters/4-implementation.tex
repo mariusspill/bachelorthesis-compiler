@@ -81,6 +81,7 @@ To support printing floats, I added a \texttt{print\_float} function to the C ru
 
 To illustrate the end-to-end mechanics, consider how the compiler handles the statement \texttt{a: float = 3.14}. The float value is converted to its IEEE~754 bit representation as a 64-bit integer and loaded into an integer register using \texttt{li}. It is then stored at byte offset~7 from the tagged heap pointer, which places it in the payload field of the box:
 
+\needspace{8\baselineskip}
 \begin{lstlisting}
     li      a2, 4614253070214989087
     add     t0, zero, a2
@@ -89,6 +90,7 @@ To illustrate the end-to-end mechanics, consider how the compiler handles the st
 
 When the program calls \texttt{print(a)}, the compiler emits instructions to unbox the float: it loads the raw bits from the heap back into an integer register, then uses \texttt{fmv.d.x} to reinterpret those bits as a double-precision value in the floating-point register \texttt{fa0}, and finally calls the runtime's \texttt{print\_float}:
 
+\needspace{8\baselineskip}
 \begin{lstlisting}
     ld      a1, 7(a1)
     fmv.d.x fa0, a1
@@ -113,6 +115,7 @@ Because \texttt{fa0} and \texttt{fa1} now appear explicitly in the instruction s
 
 The generated code for a float addition such as \texttt{a + b} mirrors the unbox--operate--box pattern. Both operands are loaded from the heap, moved into float registers, added, and the result is stored back:
 
+\needspace{13\baselineskip}
 \begin{lstlisting}
     ld      a3, 7(a3)
     fmv.d.x fa0, a2
@@ -145,6 +148,7 @@ The branching case differs structurally from the integer path. For integers, RIS
 
 The following walkthrough shows the branching case. As with any float operation, both values are unboxed from the heap and moved into float registers. The \texttt{flt.d} instruction compares them and writes~1 or~0 to an integer register. The result is then tagged and the branch is taken accordingly:
 
+\needspace{14\baselineskip}
 \begin{lstlisting}
     ld      a2, 7(a2)
     ld      a1, 7(a1)
@@ -170,6 +174,7 @@ In instruction selection, the \texttt{int\_to\_float} operation is lowered to a 
 
 The following listing shows the generated code for \texttt{3.2 * 3}, where the first operand is a float and the second is an integer. The float is unboxed from the heap as usual, while the integer literal~3 is loaded in its tagged form (value~6), untagged, and converted to a double before the multiplication:
 
+\needspace{14\baselineskip}
 \begin{lstlisting}
     ld      a3, 7(a3)
     li      a2, 6
